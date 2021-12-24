@@ -1,0 +1,22 @@
+{
+  "name": "quadraticsievefactorization",
+  "version": "1.0.0",
+  "description": "Quadratic Sieve integer factorization method for JavaScript bigints",
+  "main": "QuadraticSieveFactorization.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yaffle/QuadraticSieveFactorization.git"
+  },
+  "keywords": [
+    "quadratic",
+    "sieve",
+    "integer",
+    "factorization",
+    "prime",
+    "bigint"
+  ],
+  "author": "Yaffe"
+}
