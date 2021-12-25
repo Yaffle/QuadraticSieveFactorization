@@ -1,4 +1,5 @@
 /*jshint esversion:6*/
+import isPrime from './isPrime.js';
 
 function modInverse(a, m) {
   if (a < 0n || a >= m || m <= 0n) {
@@ -53,7 +54,7 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1n) {
   n = BigInt(n);
   p = BigInt(p);
   e = BigInt(e);
-  const m = p**e;
+  const m = e === 1n ? p : (e === 2n ? p * p : 0n); // TODO: p**e
   n %= m;
   if ((p + 1n) % 4n === 0n) {
     if (e !== 1n) {
@@ -289,39 +290,32 @@ function product(array) {
 }
 
 function modPowSmall(base, exponent, modulus) {
-  if (modulus * modulus > Number.MAX_SAFE_INTEGER) {
+  if (Math.min(Math.pow(modulus, 2), Math.pow(base, 2)) > Number.MAX_SAFE_INTEGER) {
     throw new RangeError();
   }
-  if (exponent < 0) {
-    throw new RangeError();
-  }
-  base = base % modulus;
   let accumulator = 1;
   while (exponent !== 0) {
-    let q = (exponent - exponent % 2) / 2;
-    if (exponent !== q + q) {
+    if (exponent % 2 === 0) {
+      exponent /= 2;
+      base = (base * base) % modulus;
+    } else {
+      exponent -= 1;
       accumulator = (accumulator * base) % modulus;
     }
-    exponent = q;
-    base = (base * base) % modulus;
   }
   return accumulator;
 }
 
 function modPow(base, exponent, modulus) {
-  // exponent can be huge, use non-recursive variant
-  if (exponent < 0n) {
-    throw new RangeError();
-  }
-  base = base % modulus;
   let accumulator = 1n;
   while (exponent !== 0n) {
-    let q = (exponent - exponent % 2n) / 2n;
-    if (exponent !== q + q) {
+    if (exponent % 2n === 0n) {
+      exponent /= 2n;
+      base = (base * base) % modulus;
+    } else {
+      exponent -= 1n;
       accumulator = (accumulator * base) % modulus;
     }
-    exponent = q;
-    base = (base * base) % modulus;
   }
   return accumulator;
 }
@@ -399,7 +393,6 @@ BitSet.prototype.toString = function () {
   return this.data.map(x => (x >>> 0).toString(2).padStart(BitSetWordSize, '0').split('').reverse().join('')).join('').slice(0, this.size);
 };
 
-
 // pass factorizations with associated values (arrays of powers) to the next call
 // returns linear combinations of vectors which result in zero vector by modulo 2
 // (basis of the kernel of the matrix)
@@ -467,73 +460,6 @@ function solve(matrixSize) {
 
 
 
-function isPrime(n) {
-  n = BigInt(n);
-  if (n < 2n) {
-    throw new RangeError();
-  }
-  if (n % 2n === 0n) {
-    return n === 2n;
-  }
-
-  if (n % 3n === 0n || n % 5n === 0n) {
-    return n === 3n || n === 5n;
-  }
-  const wheel3 = [0, 4, 6, 10, 12, 16, 22, 24, 24];
-  for (let i = 7, max = Math.min(1024, Math.floor(Math.sqrt(Number(n)))); i <= max; i += 30) {
-    for (let j = 0; j < wheel3.length; j += 3) {
-      const p1 = i + wheel3[j + 0];
-      const p2 = i + wheel3[j + 1];
-      const p3 = i + wheel3[j + 2];
-      const r = Number(n % BigInt((p1 * p2 * p3))) | 0;
-      if (r % p1 === 0 || r % p2 === 0 || r % p3 === 0) {
-        return false;
-      }
-    }
-  }
-  if (n < 1024**2) {
-    return true;
-  }
-
-  // https://en.wikipedia.org/wiki/Miller%E2%80%93Rabin_primality_test#Deterministic_variants
-  let r = 0;
-  let d = n - 1n;
-  while (d % 2n === 0n) {
-    d /= 2n;
-    r += 1;
-  }
-  // https://en.wikipedia.org/wiki/Miller–Rabin_primality_test#Testing_against_small_sets_of_bases
-  const values = [10, 20, 24, 31, 40, 41, 48, 48, 61, 61, 61, 78, 81];
-  const primes = [2, 3, 5, 7, 11, 13, 17, 17, 19, 19, 19, 23, 29];
-  let i = 0;
-  const x = Math.ceil(Math.log2(Number(n)));
-  while (x > values[i] && i < values.length) {
-    i += 1;
-  }
-  let bases = null;
-  if (i < values.length) {
-    bases = primes.slice(0, i + 1);
-  } else {
-    const lnN = Number(log2(BigInt(n))) * Math.log(2);
-    const max = Math.floor(2 * lnN * Math.log(lnN));
-    const range = new Array(max - 2 + 1);
-    for (let i = 2; i <= max; i += 1) {
-      range[i - 2] = i;
-    }
-    bases = range;
-  }
-  for (const a of bases) {
-    const adn = modPow(BigInt(a), d, n);
-    if (adn !== 1n) {
-      for (let i = 0, x = adn; x !== n - 1n; i += 1, x = (x * x) % n) {
-        if (i === r - 1) {
-          return false;
-        }
-      }
-    }
-  }
-  return true;
-}
 
 function exp2(x) {
   return Math.pow(2, Math.floor(x)) * Math.exp(Math.LN2 * (x - Math.floor(x)));
@@ -551,6 +477,7 @@ function QuadraticPolynomial(A, B, C, q, qInv, N) {
   this.qInv = qInv;
   this.N = N;
 }
+
 QuadraticPolynomial.prototype.calculateNewPolynomial = function (M, primes, N) {
   let q = this.q;
   if (q === 1n) {
@@ -588,7 +515,7 @@ QuadraticPolynomial.prototype.Y = function (x) {
 // https://ru.wikipedia.org/wiki/Алгоритм_Диксона
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 
-function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
+function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
   if (sieveSize == undefined) {
     sieveSize = Math.pow(2, 18);
     sieveSize = Math.min(sieveSize, Math.ceil(Math.pow(primes[primes.length - 1], 1.15)));
@@ -600,9 +527,11 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
   const SIEVE = new Array(sieveSize).fill(-0);
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
-  const largePrimes = new Map(); // faster (?)
+  const largePrimes = Object.create(null); //TODO: new Map(); // faster (?)
   var lpCount = 0;
   var cCount = 0;
+  
+  var xxx = [];
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   var baseWheels = [];
@@ -611,7 +540,7 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
       var nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
-        yield new CongruenceOfsquareOfXminusYmoduloN(BigInt(p), 0n, N, null);//?
+        xxx.push(new CongruenceOfsquareOfXminusYmoduloN(BigInt(p), 0n, N, null));//?
       } else {
         var roots = getSquareRootsModuloPrime(nmodpInBeta, p, beta);
         for (var j = 0; j < roots.length; j += 1) {
@@ -623,9 +552,9 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
   const lpStrategy = function (p, X, Y) {
     // https://ru.wikipedia.org/wiki/Алгоритм_Диксона#Стратегия_LP
-    const lp = largePrimes.get(p);
+    const lp = largePrimes[p];
     if (lp == undefined) {
-      largePrimes.set(p, {X: X, Y: Y});
+      largePrimes[p] = {X: X, Y: Y};
     } else {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
@@ -709,12 +638,22 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     return newWheels;
   };
 
-  for (let k = 0; 2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2); k += 1) {
+  let nextI = 0;
+  let k = 0;
+  const iterator = {next: null};
+iterator.next = function () {
+  if (xxx.length > 0) {
+    return {value: xxx.pop(), done: false};
+  }
+  for (; 2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2); k += 1) {
+    if (nextI === sieveSize) {
+      nextI = 0;
+    }
+    const offset = useMultiplePolynomials ? -sieveSize / 2 : (k % 2 === 0 && k !== 0 ? -1 : 1) * Math.floor((k + 1) / 2) * sieveSize;
+    if (nextI === 0) {
 
     polynomial = useMultiplePolynomials ? polynomial.calculateNewPolynomial(sieveSize / 2, primes, N) : polynomial;
     const wheels = useMultiplePolynomials ? updateWheels(polynomial) : baseWheels;
-
-    const offset = useMultiplePolynomials ? -sieveSize / 2 : (k % 2 === 0 && k !== 0 ? -1 : 1) * Math.floor((k + 1) / 2) * sieveSize;
 
     for (let i = 0; i < sieveSize; i += 1) {
       SIEVE[i] = -0;
@@ -731,10 +670,13 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
         SIEVE[kpplusr] += log2p;
       }
     }
+    
+    }
 
     let j = -1;
     let thresholdApproximation = 0.5;
-    for (let i = 0; i < sieveSize; i += 1) {
+    for (let i = nextI; i < sieveSize; i += 1) {
+      nextI = i + 1;
       // it is slow to compute it, so trying to optimize:
       //thresholdApproximation = Math.log2(Math.abs(Number((BigInt(i + offset) + baseOffset)**2n - N)));
 
@@ -761,23 +703,23 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
           var factorization = getSmoothFactorization(Y, primes);
           if (factorization != null) {
             cCount += 1;
-            yield new CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization);
+            return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization), done: false};
           } else {
             console.count("?");
-            var p = 1n;
+            /*var p = 1n;
             for (var w of wheels) {
               if ((i + offset - w.root) % w.step === 0) {
                 console.log(w);
                 p *= BigInt(w.step);
               }
-            }
+            }*/
           }
         } else {
           if (threshold < value) {
             const p = Math.round(exp2(threshold + twoB - value));
             var c = lpStrategy(p, X, Y);
             if (c != null) {
-              yield c;
+              return {value: c, done: false};
             }
           }
         }
@@ -785,6 +727,11 @@ function* congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     }
     //console.debug(k, lpCount, cCount, lpCount + cCount);
   }
+};
+  iterator[globalThis.Symbol.iterator] = function () {
+    return this;
+  };
+  return iterator;
 }
 
 function gcd(a, b) {
