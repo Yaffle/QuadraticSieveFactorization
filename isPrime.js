@@ -17,17 +17,21 @@ function modPow(base, exponent, modulus) {
   return accumulator;
 }
 
-export default function isPrime(n) {
+function isPrime(n) {
   n = BigInt(n);
   if (n < 2n) {
     throw new RangeError();
   }
-  if (n % 2n === 0n) {
+
+  const s = Number(n % 30n);
+  if (s % 2 === 0) {
     return n === 2n;
   }
-
-  if (n % 3n === 0n || n % 5n === 0n) {
-    return n === 3n || n === 5n;
+  if (s % 3 === 0) {
+    return n === 3n;
+  }
+  if (s % 5 === 0) {
+    return n === 5n;
   }
   const wheel3 = [0, 4, 6, 10, 12, 16, 22, 24, 24];
   for (let i = 7, max = Math.min(1024, Math.floor(Math.sqrt(Number(n)))); i <= max; i += 30) {
@@ -85,3 +89,5 @@ export default function isPrime(n) {
   }
   return true;
 }
+
+export default isPrime;
