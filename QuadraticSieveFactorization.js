@@ -2,6 +2,8 @@
 import isPrime from './isPrime.js';
 
 function modInverse(a, m) {
+  a = BigInt(a);
+  m = BigInt(m);
   if (a < 0n || a >= m || m <= 0n) {
     throw new RangeError();
   }
@@ -26,6 +28,8 @@ function modInverse(a, m) {
 }
 
 function modInverseSmall(a, m) {
+  a = Number(a);
+  m = Number(m);
   const maxSMI = (~(-1 << 30));
   if (a < 0 || a >= m || m <= 0 || m > maxSMI) {
     throw new RangeError();
@@ -54,7 +58,7 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1n) {
   n = BigInt(n);
   p = BigInt(p);
   e = BigInt(e);
-  const m = e === 1n ? p : (e === 2n ? p * p : 0n); // TODO: p**e
+  const m = p**e;
   n %= m;
   if ((p + 1n) % 4n === 0n) {
     if (e !== 1n) {
@@ -69,8 +73,11 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1n) {
       return [x1, m - x1];
     }
     // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
-    const r = modPow(n, (p + 1n) / 4n, p);
+    let r = modPow(n, (p + 1n) / 4n, p);
     if ((r * r) % p === n) {
+      if (r > p - r) {
+        r = p - r;
+      }
       return [r, p - r];
     }
     return [];
@@ -79,7 +86,9 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1n) {
 }
 
 function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
-  console.assert(typeof n === "number" && typeof p === "number" && typeof e === "number");
+  n = Number(n);
+  p = Number(p);
+  e = Number(e);
   const m = Math.pow(p, e);
   n = n % m;
   if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER)))) { // + p is a prime number
@@ -235,10 +244,12 @@ function CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization) {
 }
 CongruenceOfsquareOfXminusYmoduloN.prototype.toString = function () {
   const X = this.X, Y = this.Y, N = this.N;
-  return 'X**2 ≡ Y (mod N)'.replaceAll('X', X).replaceAll('Y', Y).replaceAll('N', N);
+  return 'X**2 ≡ Y (mod N), Y = F'.replaceAll('X', X).replaceAll('Y', Y).replaceAll('N', N).replaceAll('F', this.factorization.join(' * '));
 };
 
 function isQuadraticResidueModuloPrime(a, p) {
+  a = BigInt(a);
+  p = Number(p);
   if (p === 2) {
     // "Modulo 2, every integer is a quadratic residue." - https://en.wikipedia.org/wiki/Quadratic_residue#Prime_modulus
     return true;
@@ -290,7 +301,10 @@ function product(array) {
 }
 
 function modPowSmall(base, exponent, modulus) {
-  if (Math.min(Math.pow(modulus, 2), Math.pow(base, 2)) > Number.MAX_SAFE_INTEGER) {
+  base = Number(base);
+  exponent = Number(exponent);
+  modulus = Number(modulus);
+  if (Math.max(Math.pow(modulus, 2), Math.pow(base, 2)) > Number.MAX_SAFE_INTEGER) {
     throw new RangeError();
   }
   let accumulator = 1;
@@ -307,6 +321,9 @@ function modPowSmall(base, exponent, modulus) {
 }
 
 function modPow(base, exponent, modulus) {
+  base = BigInt(base);
+  exponent = BigInt(exponent);
+  modulus = BigInt(modulus);
   let accumulator = 1n;
   while (exponent !== 0n) {
     if (exponent % 2n === 0n) {
@@ -512,6 +529,14 @@ QuadraticPolynomial.prototype.Y = function (x) {
 };
 
 
+function thresholdApproximationInterval(polynomial, x, threshold) {
+  let w = 512;
+  while (w >= 2 && Math.abs(Math.log2(Math.abs(Number(polynomial.Y(x + w)))) - threshold) > 0.5) {
+    w /= 2;
+  }
+  return x + w;
+}
+
 // https://ru.wikipedia.org/wiki/Алгоритм_Диксона
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 
@@ -630,7 +655,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
         const x = BigInt(wheel.root);
         const X = (polynomial.A * x + polynomial.B);
         const Y = X * X - N;
-        if (Y % BigInt(wheel.pInBeta) !== 0n) {
+        if (Y % BigInt(wheel.step) !== 0n) {
           throw new Error();
         }
       }
@@ -645,11 +670,12 @@ iterator.next = function () {
   if (xxx.length > 0) {
     return {value: xxx.pop(), done: false};
   }
-  for (; 2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2); k += 1) {
+  for (; 2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2);) {
     if (nextI === sieveSize) {
+      k += 1;
       nextI = 0;
     }
-    const offset = useMultiplePolynomials ? -sieveSize / 2 : (k % 2 === 0 && k !== 0 ? -1 : 1) * Math.floor((k + 1) / 2) * sieveSize;
+    const offset = useMultiplePolynomials ? -sieveSize / 2 : (k % 2 === 0 ? 1 : -1) * Math.floor((k + 1) / 2) * sieveSize;
     if (nextI === 0) {
 
     polynomial = useMultiplePolynomials ? polynomial.calculateNewPolynomial(sieveSize / 2, primes, N) : polynomial;
@@ -681,17 +707,10 @@ iterator.next = function () {
       //thresholdApproximation = Math.log2(Math.abs(Number((BigInt(i + offset) + baseOffset)**2n - N)));
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      if (i >= j) {
+      if (i >= j && sieveSize >= 16384) {
         const Y = polynomial.Y(i + offset);
         thresholdApproximation = Math.log2(Math.abs(Number(Y))) - twoB;
-
-        var tmp = -Number(Y) / (2 * Number(polynomial.A * BigInt(i + offset) + polynomial.B));
-        var a = Math.SQRT2;
-
-        j = i + Math.floor(Math.max(tmp * (a - 1), tmp * -(1 - 1 / a)));
-        if (i < sieveSize / 2) {
-          j = Math.min(j, sieveSize / 2);
-        }
+        j = thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation + twoB) - offset;
       }
 
       var value = SIEVE[i];
@@ -727,6 +746,7 @@ iterator.next = function () {
     }
     //console.debug(k, lpCount, cCount, lpCount + cCount);
   }
+  return {value: undefined, done: true};
 };
   iterator[globalThis.Symbol.iterator] = function () {
     return this;
@@ -796,7 +816,12 @@ QuadraticSieveFactorization.testables = {
   isPrime: isPrime,
   congruencesUsingQuadraticSieve: congruencesUsingQuadraticSieve,
   getSquareRootsModuloPrime: getSquareRootsModuloPrime,
-  getSquareRootsModuloPrimeBig: getSquareRootsModuloPrimeBig
+  getSquareRootsModuloPrimeBig: getSquareRootsModuloPrimeBig,
+  isQuadraticResidueModuloPrime: isQuadraticResidueModuloPrime,
+  isQuadraticResidueModuloPrimeBig: isQuadraticResidueModuloPrimeBig,
+  solve: solve,
+  QuadraticPolynomial: QuadraticPolynomial,
+  thresholdApproximationInterval: thresholdApproximationInterval
 };
 
 export default QuadraticSieveFactorization;
