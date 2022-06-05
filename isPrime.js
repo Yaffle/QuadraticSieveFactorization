@@ -18,7 +18,9 @@ function modPow(base, exponent, modulus) {
 }
 
 function isPrime(n) {
-  n = BigInt(n);
+  if (typeof n !== "bigint") {
+    throw new RangeError();
+  }
   if (n < 2n) {
     throw new RangeError();
   }
@@ -45,7 +47,7 @@ function isPrime(n) {
       }
     }
   }
-  if (n < 1024 * 1024) {
+  if (Number(n) < 1024 * 1024) {
     return true;
   }
 
@@ -68,7 +70,7 @@ function isPrime(n) {
   if (i < values.length) {
     bases = primes.slice(0, i + 1);
   } else {
-    const lnN = Number(log2(BigInt(n))) * Math.log(2);
+    const lnN = Number(log2(n)) * Math.log(2);
     const max = Math.floor(2 * lnN * Math.log(lnN));
     const range = new Array(max - 2 + 1);
     for (let i = 2; i <= max; i += 1) {
