@@ -6,13 +6,12 @@ function log2(x) {
 function modPow(base, exponent, modulus) {
   let accumulator = 1n;
   while (exponent !== 0n) {
-    if (exponent % 2n === 0n) {
-      exponent /= 2n;
-      base = (base * base) % modulus;
-    } else {
+    if (BigInt.asUintN(1, exponent) === 1n) {
       exponent -= 1n;
       accumulator = (accumulator * base) % modulus;
     }
+    exponent >>= 1n;
+    base = (base * base) % modulus;
   }
   return accumulator;
 }
