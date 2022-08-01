@@ -60,9 +60,19 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1) {
   e = Number(e);
   const m = e === 1 ? p : (e === 2 ? p * p : 0n); // p**BigInt(e)
   n %= m;
+  if (!(n > 0n && p > 0n && e >= 1 && n % p !== 0n)) { // + p is a prime number
+    throw new RangeError();
+  }
   if ((p + 1n) % 4n === 0n) {
     if (e !== 1) {
-      const x = getSquareRootsModuloPrimeBig(n, p, e - 1)[0];
+      const roots = getSquareRootsModuloPrimeBig(n, p, e - 1);
+      if (roots.length === 0) {
+        return [];
+      }
+      if (roots.length !== 2) {
+        throw new Error();
+      }
+      let x = roots[0];
       let x1 = (x + (n - (x * x) % m) * modInverse(x + x, m)) % m;
       if (x1 < 0n) {
         x1 += m;
@@ -84,6 +94,7 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1) {
   }
   throw new RangeError('implemented only for primes of the form 4k+3');
 }
+
 
 function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
   n = Number(n);
@@ -334,6 +345,7 @@ function modPow(base, exponent, modulus) {
 }
 
 function primes(MAX) {
+  // Note: it is slow in Chrome to create array this way when MAX >= 2**25
   const sieve = new Array(MAX + 1).fill(true);
   const result = [];
   result.push(2);
@@ -551,8 +563,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
   const largePrimes = Object.create(null); //TODO: new Map(); // faster (?)
-  
-  const xxx = [];
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels = [];
@@ -561,7 +571,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
       const nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
-        xxx.push(new CongruenceOfsquareOfXminusYmoduloN(BigInt(p), 0n, N, null));//?
+        throw new RangeError('N has a factor in prime base');
       } else {
         const roots = getSquareRootsModuloPrime(nmodpInBeta, p, beta);
         for (let j = 0; j < roots.length; j += 1) {
@@ -682,9 +692,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
   let k = 0;
   const iterator = {
     next: function congruencesUsingQuadraticSieve() {
-      if (xxx.length > 0) {
-        return {value: xxx.pop(), done: false};
-      }
       while (2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2)) {
         if (i === sieveSize) {
           k += 1;
@@ -791,6 +798,11 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
     const B = Math.min(Math.floor(Math.sqrt(L(kN) / 1.5)), (1 << 25) - 1);
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
+    for (let i = 0; i < primeBase.length; i += 1) {
+      if (Number(N % BigInt(primeBase[i])) === 0) {
+        return primeBase[i];
+      }
+    }
     const congruences = congruencesUsingQuadraticSieve(primeBase, kN); // congruences X_k^2 = Y_k mod N, where Y_k is smooth over the prime base
     const solutions = solve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
     solutions.next();
