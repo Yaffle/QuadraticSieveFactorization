@@ -16,6 +16,30 @@ function modPow(base, exponent, modulus) {
   return accumulator;
 }
 
+function fmod(a, b) {
+  return (a - Math.floor(a / b) * b) | 0;
+}
+function FastModBigInt(a) {
+  const array = [];
+  while (a !== 0n) {
+    const x = Number(BigInt.asUintN(52, a));
+    array.push(x);
+    a >>= 52n;
+  }
+  return array;
+}
+function FastMod(array, integer) {
+  const n = array.length - 1;
+  let result = fmod(array[n], integer);
+  if (n > 0) {
+    let x = fmod(2**52, integer);
+    for (let i = n - 1; i >= 0; i -= 1) {
+      result = fmod(result * x + array[i], integer);
+    }
+  }
+  return result;
+}
+
 function isPrime(n) {
   if (typeof n !== "bigint") {
     throw new RangeError();
@@ -35,13 +59,11 @@ function isPrime(n) {
     return n === 5n;
   }
   const wheel3 = [0, 4, 6, 10, 12, 16, 22, 24, 24];
+  const N = FastModBigInt(n);
   for (let i = 7, max = Math.min(1024, Math.floor(Math.sqrt(Number(n)))); i <= max; i += 30) {
-    for (let j = 0; j < wheel3.length; j += 3) {
-      const p1 = i + wheel3[j + 0];
-      const p2 = i + wheel3[j + 1];
-      const p3 = i + wheel3[j + 2];
-      const r = Number(n % BigInt((p1 * p2 * p3))) | 0;
-      if (r % p1 === 0 || r % p2 === 0 || r % p3 === 0) {
+    for (let j = 0; j < wheel3.length; j += 1) {
+      const p = i + wheel3[j];
+      if (FastMod(N, p) === 0) {
         return false;
       }
     }

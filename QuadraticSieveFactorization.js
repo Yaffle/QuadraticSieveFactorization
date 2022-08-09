@@ -155,6 +155,16 @@ function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
   if (p % 2 === 0) {
     return [1];
   }
+  if ((p + 1) % 4 === 0) {
+    // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
+    let r = modPowSmall(n, (p + 1) / 4, p);
+    if ((r * r) % p === n) {
+      if (r > p - r) {
+        r = p - r;
+      }
+      return [r, p - r];
+    }
+  }
   let rrmnmodp = 1 - n; // r**2 % p - n
   for (let tworm1 = -1; tworm1 < p; tworm1 += 2) {
     rrmnmodp += tworm1;
@@ -169,7 +179,7 @@ function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
   return [];
 }
 
-function log2(x) {
+function bitLength(x) {
   return BigInt(x.toString(16).length * 4);
 }
 
@@ -177,7 +187,7 @@ function sqrt(x) {
   if (x < BigInt((Number.MAX_SAFE_INTEGER + 1) / 2)) {
     return BigInt(Math.floor(Math.sqrt(Number(x) + 0.5)));
   }
-  const q = (log2(x) / 4n);
+  const q = (bitLength(x) / 4n);
   const initialGuess = ((sqrt(x >> (q * 2n)) + 1n) << q);
   let a = initialGuess;
   let b = a + 1n;
@@ -200,23 +210,17 @@ function getSmoothFactorization(a, base) {
   }
   let i = 0;
 
-  while (i < base.length && Number(value) > Number.MAX_SAFE_INTEGER) {
-    let primesProduct = 1;
-    const productStart = i;
-    while (i < base.length && primesProduct * base[i] <= Number.MAX_SAFE_INTEGER) {
-      primesProduct *= base[i];
-      i += 1;
+  let fastValue = FastModBigInt(value);
+  let isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
+  while (i < base.length && isBig) {
+    const p = base[i];
+    while (FastMod(fastValue, p) === 0) {
+      value /= BigInt(p);
+      fastValue = FastModBigInt(value);
+      isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
+      result.push(p);
     }
-    const valueModPrimesProduct = Number(value % BigInt(primesProduct));
-    for (let j = productStart; j < i; j += 1) {
-      const p = base[j];
-      if (valueModPrimesProduct - Math.floor(valueModPrimesProduct / p) * p === 0) {
-        while (value % BigInt(p) === 0n) {
-          value /= BigInt(p);
-          result.push(p);
-        }
-      }
-    }
+    i += 1;
   }
 
   let n = Number(value);
@@ -291,7 +295,7 @@ function isQuadraticResidueModuloPrimeBig(a, p) {
 }
 
 function log(N) {
-  const e = Math.max(N.toString(16).length * 4 - 4 * 12, 0);
+  const e = Math.max(Number(bitLength(N)) - 4 * 12, 0);
   const lnn = Math.log(Number(N >> BigInt(e))) + Math.log(2) * e;
   return lnn;
 }
@@ -483,7 +487,29 @@ function solve(matrixSize) {
 
 //!copy-paste
 
-
+function fmod(a, b) {
+  return (a - Math.floor(a / b) * b) | 0;
+}
+function FastModBigInt(a) {
+  const array = [];
+  while (a !== 0n) {
+    const x = Number(BigInt.asUintN(52, a));
+    array.push(x);
+    a >>= 52n;
+  }
+  return array;
+}
+function FastMod(array, integer) {
+  const n = array.length - 1;
+  let result = fmod(array[n], integer);
+  if (n > 0) {
+    let x = fmod(2**52, integer);
+    for (let i = n - 1; i >= 0; i -= 1) {
+      result = fmod(result * x + array[i], integer);
+    }
+  }
+  return result;
+}
 
 
 function exp2(x) {
@@ -491,6 +517,15 @@ function exp2(x) {
 }
 
 const useMultiplePolynomials = true;
+
+function toFloat(A) {
+  const e = Number(bitLength(A));
+  const s = Number(A >> BigInt(Math.max(e - 53, 0))) * Math.pow(2, Math.max(e - 53, 0) - e);
+  return {
+    significand: s,
+    exponent: e
+  };
+}
 
 // A*x**2 + 2*B*x + C, A = q**2, qInv = q**-1 mod N
 function QuadraticPolynomial(A, B, C, q, qInv, N) {
@@ -500,6 +535,14 @@ function QuadraticPolynomial(A, B, C, q, qInv, N) {
   this.q = q;
   this.qInv = qInv;
   this.N = N;
+  const a = toFloat(A);
+  const b = toFloat(B);
+  const n = toFloat(N);
+  const u = (-b.significand / a.significand) * Math.pow(2, b.exponent - a.exponent);
+  const v = Math.sqrt(n.significand * Math.pow(2, n.exponent - 2 * a.exponent)) / a.significand;
+  this.x1 = u - v;
+  this.x2 = u + v;
+  this.a = a;
 }
 
 QuadraticPolynomial.prototype.calculateNewPolynomial = function (M, primes, N) {
@@ -537,11 +580,16 @@ QuadraticPolynomial.prototype.X = function (x) {
 QuadraticPolynomial.prototype.Y = function (x) {
   return this.A * (x * x <= Number.MAX_SAFE_INTEGER ? BigInt(x * x) : (a => a * a)(BigInt(x))) + this.B * BigInt(2 * x) + this.C;
 };
+QuadraticPolynomial.prototype.log2AbsY = function (x) {
+  //const v1 = Math.log2(Math.abs(Number(this.Y(x))));
+  const v2 =  Math.log2(Math.abs(this.a.significand * (x - this.x1) * (x - this.x2))) + this.a.exponent;
+  return v2;
+};
 
 
 function thresholdApproximationInterval(polynomial, x, threshold) {
   let w = 256;
-  while (w >= 2 && Math.abs(Math.log2(Math.abs(Number(polynomial.Y(x + w)))) - threshold) > 0.5) {
+  while (w >= 2 && Math.abs(polynomial.log2AbsY(x + w) - threshold) > 0.5) {
     w /= 2;
   }
   return x + w;
@@ -575,7 +623,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
       } else {
         const roots = getSquareRootsModuloPrime(nmodpInBeta, p, beta);
         for (let j = 0; j < roots.length; j += 1) {
-          wheels.push({root: roots[j], log2p: Math.log2(p), step: pInBeta});
+          wheels.push({root: roots[j], proot: 0, log2p: Math.log2(p), step: pInBeta});
         }
       }
     }
@@ -609,8 +657,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     return null;
   };
 
-  const wheelsRoots = wheels.map(wheel => wheel.root);
-
   let polynomial = null;
   if (!useMultiplePolynomials) {
     // - Number(baseOffset % BigInt(pInBeta))
@@ -619,50 +665,40 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     for (let i = 0; i < wheels.length; i += 1) {
       const wheel = wheels[i];
       const pInBeta = wheel.step;
-      wheelsRoots[i] = wheel.root - Number(baseOffset % BigInt(pInBeta));
+      wheel.proot = wheel.root - Number(baseOffset % BigInt(pInBeta));
     }
   } else {
     polynomial = new QuadraticPolynomial(1n, 0n, -N, 1n, 1n, N);
   }
 
   const updateWheels = function (polynomial) {
-    const fmod = function (a, b) {
-      return (a - Math.floor(a / b) * b) | 0;
-    };
     //recalculate roots based on the formulat:
     //proot = ((-B + root) * modInv(A, pInBeta)) % pInBeta;
     //+some optimizations to minimize bigint usage and modInverseSmall calls
-    let smallProduct = 1;
-    let k = wheels.length - 1;
-    for (let i = wheels.length - 1; i >= -1; i -= 1) {
-      const pInBeta = i === -1 ? Number.MAX_SAFE_INTEGER : wheels[i].step;
-      if (fmod(smallProduct, pInBeta) !== 0) {
-        if (smallProduct * pInBeta >= Number.MAX_SAFE_INTEGER) {
-          const a1 = Number(polynomial.A % BigInt(smallProduct));
-          const b1 = Number(polynomial.B % BigInt(smallProduct));
-          let invA = 0;
-          let m = 1;
-          while (k > i) {
-            const wheel = wheels[k];
-            const prevm = m;
-            m = wheel.step;
-            invA = prevm % m === 0 ? invA % m : modInverseSmall(fmod(a1, m), m);
-            if (invA === 0) {
-              throw new Error('unsupported A');
-            }
-            const b = fmod(b1, m);
-            const proot = fmod((wheel.root - b) * invA, m);
-            wheelsRoots[k] = proot;
-            k -= 1;
-          }
-          smallProduct = 1;
-        }
-        smallProduct *= pInBeta;
+    const AA = FastModBigInt(polynomial.A);
+    const BB = FastModBigInt(polynomial.B);
+    for (let i = wheels.length - 1; i >= 0; i -= 1) {
+      const w = wheels[i];
+      const pInBeta = w.step;
+      //const a = Number(polynomial.A % BigInt(pInBeta));
+      //const b = Number(polynomial.B % BigInt(pInBeta));
+      const a = FastMod(AA, pInBeta);
+      const b = FastMod(BB, pInBeta);
+      const invA = modInverseSmall(a, pInBeta);
+      if (invA === 0) {
+        throw new Error('unsupported A');
+      }
+      const proot1 = fmod((-b + w.root) * invA, pInBeta);
+      w.proot = proot1;
+      if (i >= 1 && wheels[i - 1].step === pInBeta && wheels[i - 1].root === pInBeta - w.root) {
+        const proot2 = fmod((-b - w.root) * invA, pInBeta);
+        wheels[i - 1].proot = proot2;
+        i -= 1;
       }
     }
     if (false) {
       for (let k = 0; k < wheels.length; k += 1) {
-        const x = BigInt(wheelsRoots[k]);
+        const x = BigInt(wheels[k].proot);
         const X = (polynomial.A * x + polynomial.B);
         const Y = X * X - N;
         if (Y % BigInt(wheels[k].step) !== 0n) {
@@ -678,7 +714,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     }
     for (let j = 0; j < wheels.length; j += 1) {
       const w = wheels[j];
-      const root = wheelsRoots[j];
+      const root = w.proot;
       const log2p = w.log2p;
       const step = w.step;
       const start = (root - offset) - Math.floor((root - offset) / step) * step;
@@ -715,8 +751,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
           //TODO: the threshold calculation is much more simple in the Youtube videos (?)
           if (i >= j && sieveSize >= 2048) {
-            const Y = polynomial.Y(i + offset);
-            thresholdApproximation = Math.log2(Math.abs(Number(Y))) - twoB;
+            thresholdApproximation = polynomial.log2AbsY(i + offset) - twoB;
             j = thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation + twoB) - offset;
           }
 
@@ -724,7 +759,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
           if (thresholdApproximation < value) {
             const X = polynomial.X(i + offset);
             const Y = polynomial.Y(i + offset);
-            const threshold = Math.log2(Math.abs(Number(Y))) - twoB;
+            const threshold = polynomial.log2AbsY(i + offset) - twoB;
             if (threshold + twoB - 1 < value) {
               const factorization = getSmoothFactorization(Y, primes);
               if (factorization != null) {
@@ -734,7 +769,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
                 /*let p = 1n;
                 for (let n = 0; n < wheels.length; n += 1) {
                   const w = wheels[n];
-                  if ((i + offset - wheelsRoots[n]) % w.step === 0) {
+                  if ((i + offset - wheels[n].proot) % w.step === 0) {
                     console.log(w);
                     p *= BigInt(w.step);
                   }
@@ -807,7 +842,15 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     const solutions = solve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
     solutions.next();
     let c = null;
+    let c1 = 0;
+    let start = Date.now();
+    let last = start;
     while ((c = congruences.next().value) != undefined) {
+      c1 += 1;
+      if (Date.now() - last > 5000) {
+        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (Date.now() - start) / c1 * primeBase.length);
+        last = Date.now();
+      }
       const solution = c.Y === 0n ? [c] : solutions.next([c.factorization.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p))), c]).value;
       if (solution != null) {
         const X = product(solution.map(c => c.X));
