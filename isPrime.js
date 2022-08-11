@@ -17,7 +17,7 @@ function modPow(base, exponent, modulus) {
 }
 
 function fmod(a, b) {
-  return (a - Math.floor(a / b) * b) | 0;
+  return (a - Math.floor(a / b) * b);
 }
 function FastModBigInt(a) {
   const array = [];
@@ -37,7 +37,7 @@ function FastMod(array, integer) {
       result = fmod(result * x + array[i], integer);
     }
   }
-  return result;
+  return result | 0;
 }
 
 function isPrime(n) {
