@@ -488,7 +488,7 @@ function solve(matrixSize) {
 //!copy-paste
 
 function fmod(a, b) {
-  return (a - Math.floor(a / b) * b) | 0;
+  return (a - Math.floor(a / b) * b);
 }
 function FastModBigInt(a) {
   const array = [];
@@ -508,7 +508,7 @@ function FastMod(array, integer) {
       result = fmod(result * x + array[i], integer);
     }
   }
-  return result;
+  return result | 0;
 }
 
 
@@ -518,15 +518,6 @@ function exp2(x) {
 
 const useMultiplePolynomials = true;
 
-function toFloat(A) {
-  const e = Number(bitLength(A));
-  const s = Number(A >> BigInt(Math.max(e - 53, 0))) * Math.pow(2, Math.max(e - 53, 0) - e);
-  return {
-    significand: s,
-    exponent: e
-  };
-}
-
 // A*x**2 + 2*B*x + C, A = q**2, qInv = q**-1 mod N
 function QuadraticPolynomial(A, B, C, q, qInv, N) {
   this.A = A;
@@ -535,14 +526,12 @@ function QuadraticPolynomial(A, B, C, q, qInv, N) {
   this.q = q;
   this.qInv = qInv;
   this.N = N;
-  const a = toFloat(A);
-  const b = toFloat(B);
-  const n = toFloat(N);
-  const u = (-b.significand / a.significand) * Math.pow(2, b.exponent - a.exponent);
-  const v = Math.sqrt(n.significand * Math.pow(2, n.exponent - 2 * a.exponent)) / a.significand;
+  const logA = log(A);
+  const u = -Math.exp(log(B) - logA);
+  const v = Math.exp(log(N) / 2 - logA);
   this.x1 = u - v;
   this.x2 = u + v;
-  this.a = a;
+  this.log2a = logA / Math.LN2;
 }
 
 QuadraticPolynomial.prototype.calculateNewPolynomial = function (M, primes, N) {
@@ -582,7 +571,7 @@ QuadraticPolynomial.prototype.Y = function (x) {
 };
 QuadraticPolynomial.prototype.log2AbsY = function (x) {
   //const v1 = Math.log2(Math.abs(Number(this.Y(x))));
-  const v2 =  Math.log2(Math.abs(this.a.significand * (x - this.x1) * (x - this.x2))) + this.a.exponent;
+  const v2 =  Math.log2(Math.abs((x - this.x1) * (x - this.x2))) + this.log2a;
   return v2;
 };
 
@@ -610,7 +599,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
   const SIEVE = new Array(sieveSize).fill(-0);
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
-  const largePrimes = Object.create(null); //TODO: new Map(); // faster (?)
+  const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels = [];
@@ -619,7 +608,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
       const nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
-        throw new RangeError('N has a factor in prime base');
+        console.warn('N has a factor in prime base', N, p);
       } else {
         const roots = getSquareRootsModuloPrime(nmodpInBeta, p, beta);
         for (let j = 0; j < roots.length; j += 1) {
@@ -631,9 +620,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
   const lpStrategy = function (p, X, Y) {
     // https://ru.wikipedia.org/wiki/Алгоритм_Диксона#Стратегия_LP
-    const lp = largePrimes[p];
+    const lp = largePrimes.get(p);
     if (lp == undefined) {
-      largePrimes[p] = {X: X, Y: Y};
+      largePrimes.set(p, {X: X, Y: Y});
     } else {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
@@ -688,10 +677,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
       if (invA === 0) {
         throw new Error('unsupported A');
       }
-      const proot1 = fmod((-b + w.root) * invA, pInBeta);
+      const proot1 = fmod((-b + w.root) * invA, pInBeta) | 0;
       w.proot = proot1;
       if (i >= 1 && wheels[i - 1].step === pInBeta && wheels[i - 1].root === pInBeta - w.root) {
-        const proot2 = fmod((-b - w.root) * invA, pInBeta);
+        const proot2 = fmod((-b - w.root) * invA, pInBeta) | 0;
         wheels[i - 1].proot = proot2;
         i -= 1;
       }
