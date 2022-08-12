@@ -735,7 +735,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
         let j = -1;
         let thresholdApproximation = 0.5;
-        while (++i < sieveSize) {
+        while ((i += 1) < sieveSize) {
           // it is slow to compute the threshold on every iteration, so trying to optimize:
 
           //TODO: the threshold calculation is much more simple in the Youtube videos (?)

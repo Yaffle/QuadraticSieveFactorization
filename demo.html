@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Integer factorization calculator</title>
+<meta name="description" content="Web application that factors integers using MPQS algorithm.">
+
+<script type="module">
+  import isPrime from './isPrime.js';
+  import factorize from './QuadraticSieveFactorization.js';
+  document.querySelector('button').onclick = function () {
+    const integer = eval(document.querySelector('input').value.replace(/(\d+)/g, '$1n'));
+    const factors = [];
+    let a = integer;
+    if (a < 0n) {
+      a *= -1n;
+      factors.push(-1n);
+    }
+    while (a !== 1n) {
+      const f = BigInt(isPrime(a) ? a : factorize(a));
+      factors.push(f);
+      if (a % f !== 0n) {
+        throw new RangeError();
+      }
+      a /= f;
+    }
+    factors.sort((a, b) => Number(a - b));
+    document.querySelector('output').innerHTML = '<math>' + '<mn>' + integer + '</mn>' + '<mo>=</mo>' + factors.map(f => '<mn>' + f + '</mn>').join('<mo>*</mo>') + '</math>';
+  };
+</script>
+</head>
+<body>
+<div><input type="text" value="2**128+1" /><button>Go</button></div>
+<output>&nbsp;</output>
+<div>
+<a href="https://github.com/Yaffle/QuadraticSieveFactorization">source code</a>
+</div>
+</body>
+</html>

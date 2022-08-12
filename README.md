@@ -13,3 +13,5 @@ console.timeEnd();
 // ~110ms
 console.assert(f === 5704689200685129054721n || f === 59649589127497217n, f);
 ```
+
+See [demo](https://yaffle.github.io/QuadraticSieveFactorization/demo.html).
