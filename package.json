@@ -19,5 +19,9 @@
     "bigint"
   ],
   "author": "Yaffe",
-  "type": "module"
+  "type": "module",
+  "files": [
+    "isPrime.js",
+    "QuadraticSieveFactorization.js"
+  ]
 }
