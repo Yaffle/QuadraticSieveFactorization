@@ -8,29 +8,49 @@
 <script type="module">
   import isPrime from './isPrime.js';
   import factorize from './QuadraticSieveFactorization.js';
-  document.querySelector('button').onclick = function () {
+  document.querySelector('form').onsubmit = function (event) {
+    event.preventDefault();
     const integer = eval(document.querySelector('input').value.replace(/(\d+)/g, '$1n'));
-    const factors = [];
-    let a = integer;
-    if (a < 0n) {
-      a *= -1n;
-      factors.push(-1n);
+    const primeFactors = [];
+    if (integer < 0n) {
+      primeFactors.push(-1n);
+      integer = -integer;
     }
-    while (a !== 1n) {
-      const f = BigInt(isPrime(a) ? a : factorize(a));
-      factors.push(f);
-      if (a % f !== 0n) {
-        throw new RangeError();
+    const factors = [integer];
+    while (factors.length !== 0) {
+      let a = factors.pop();
+      while (a !== 1n) {
+        if (isPrime(a)) {
+          primeFactors.push(BigInt(a));
+          a /= a;
+        } else {
+          const f = BigInt(factorize(a));
+          factors.push(f);
+          if (a % f !== 0n) {
+            throw new RangeError();
+          }
+          a /= f;
+        }
       }
-      a /= f;
     }
-    factors.sort((a, b) => Number(a - b));
-    document.querySelector('output').innerHTML = '<math>' + '<mn>' + integer + '</mn>' + '<mo>=</mo>' + factors.map(f => '<mn>' + f + '</mn>').join('<mo>*</mo>') + '</math>';
+    primeFactors.sort((a, b) => Number(a - b));
+    const group = function (factors) {
+      const result = [];
+      let i = 0;
+      for (let j = 0; j <= factors.length; j++) {
+        if (j === factors.length || factors[i] !== factors[j]) {
+          result.push({prime: factors[i], multiplicity: (j - i)});
+          i = j;
+        }
+      }
+      return result;
+    };
+    document.querySelector('output').innerHTML = integer + ' = ' + group(primeFactors).map(g => g.multiplicity === 1 ? g.prime : g.prime + '**' + g.multiplicity).join(' * ');
   };
 </script>
 </head>
 <body>
-<div><input type="text" value="2**128+1" /><button>Go</button></div>
+<div><form><input type="text" value="2**128+1" /><button>Go</button></form></div>
 <output>&nbsp;</output>
 <div>
 <a href="https://github.com/Yaffle/QuadraticSieveFactorization">source code</a>
