@@ -824,7 +824,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
-        return primeBase[i];
+        return BigInt(primeBase[i]);
       }
     }
     const congruences = congruencesUsingQuadraticSieve(primeBase, kN); // congruences X_k^2 = Y_k mod N, where Y_k is smooth over the prime base
