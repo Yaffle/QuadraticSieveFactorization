@@ -580,15 +580,19 @@ function thresholdApproximationInterval(polynomial, x, threshold) {
 // https://ru.wikipedia.org/wiki/Алгоритм_Диксона
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 
-function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
-  if (sieveSize == undefined) {
-    sieveSize = Math.pow(2, 18);
-    sieveSize = Math.min(sieveSize, Math.ceil(Math.pow(primes[primes.length - 1], 1.15)));
-    sieveSize = Math.max(sieveSize, primes[primes.length - 1] + 1);
+function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
+  let sieveSize1 = Number(sieveSize0 || 0);
+  if (sieveSize1 === 0) {
+    sieveSize1 = Math.pow(2, 18);
+    sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(primes[primes.length - 1], 1.15)));
+    sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
   }
-  sieveSize += sieveSize % 2;
+  sieveSize1 += sieveSize1 % 2;
+  const sieveSize = sieveSize1;
 
-  N = BigInt(N);
+  if (typeof N !== 'bigint') {
+    throw new RangeError();
+  }
   const SIEVE = new Array(sieveSize).fill(-0);
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
@@ -704,8 +708,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     }
   };
   
-  const updateSieve = function (offset) {
-    for (let j = 0; j < sieveSize; j += 1) {
+  const updateSieveSegment = function (offset, segmentStart, segmentEnd) {
+    for (let j = segmentStart; j < segmentEnd; j += 1) {
       SIEVE[j] = -0;
     }
     for (let j = 0; j < wheels.length; j += 1) {
@@ -716,25 +720,35 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
       const step = w.step;
       for (let k = 0; k <= 1; k += 1) {
         const root = k === 0 ? root1 : root2;
-        const start = (root - offset) - Math.floor((root - offset) / step) * step;
-        for (let kpplusr = start; kpplusr < sieveSize; kpplusr += step) {
+        const x = (root - offset - segmentStart);
+        const start = segmentStart + (x - Math.floor(x / step) * step);
+        for (let kpplusr = start; kpplusr < segmentEnd; kpplusr += step) {
           SIEVE[kpplusr] += log2p;
         }
       }
     }
   };
 
-  let i = -1;
+  const updateSieve = function (offset) {
+    // updateSieveSegment(offset, 0, sieveSize);
+    const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
+    for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
+      const segmentEnd = Math.min(segmentStart + segmentSize, sieveSize);
+      updateSieveSegment(offset, segmentStart, segmentEnd);
+    }
+  };
+
+  let i1 = -1;
   let k = 0;
   const iterator = {
     next: function congruencesUsingQuadraticSieve() {
       while (2 * k * sieveSize <= Math.pow(primes[primes.length - 1], 2)) {
-        if (i === sieveSize) {
+        if (i1 === sieveSize) {
           k += 1;
-          i = -1;
+          i1 = -1;
         }
         const offset = useMultiplePolynomials ? -sieveSize / 2 : (k % 2 === 0 ? 1 : -1) * Math.floor((k + 1) / 2) * sieveSize;
-        if (i === -1) {
+        if (i1 === -1) {
 
           if (useMultiplePolynomials) {
             polynomial = polynomial.calculateNewPolynomial(sieveSize / 2, primes, N);
@@ -746,6 +760,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
         let j = -1;
         let thresholdApproximation = 0.5;
+        let i = i1;
         while ((i += 1) < sieveSize) {
           // it is slow to compute the threshold on every iteration, so trying to optimize:
 
@@ -763,6 +778,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
               const Y = polynomial.Y(i + offset);
               const factorization = getSmoothFactorization(Y, primes);
               if (factorization != null) {
+                i1 = i;
                 return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization), done: false};
               } else {
                 console.count('?');
@@ -782,12 +798,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
                 const p = Math.round(exp2(threshold + twoB - value));
                 const c = lpStrategy(p, polynomial, i + offset);
                 if (c != null) {
+                  i1 = i;
                   return {value: c, done: false};
                 }
               }
             }
           }
         }
+        i1 = sieveSize;
       }
       return {value: undefined, done: true};
     }
