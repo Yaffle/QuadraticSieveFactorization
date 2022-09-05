@@ -54,7 +54,7 @@ function modInverseSmall(a, m) {
   return oldS < 0 ? oldS + m : oldS;
 }
 
-function getSquareRootsModuloPrimeBig(n, p, e = 1) {
+function squareRootModuloOddPrimeBig(n, p, e = 1) {
   n = BigInt(n);
   p = BigInt(p);
   e = Number(e);
@@ -65,14 +65,10 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1) {
   }
   if ((p + 1n) % 4n === 0n) {
     if (e !== 1) {
-      const roots = getSquareRootsModuloPrimeBig(n, p, e - 1);
-      if (roots.length === 0) {
-        return [];
+      const x = squareRootModuloOddPrimeBig(n, p, e - 1);
+      if (x === -1n) {
+        return -1n;
       }
-      if (roots.length !== 2) {
-        throw new Error();
-      }
-      let x = roots[0];
       let x1 = (x + (n - (x * x) % m) * modInverse(x + x, m)) % m;
       if (x1 < 0n) {
         x1 += m;
@@ -80,7 +76,7 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1) {
       if (x1 > m - x1) {
         x1 = m - x1;
       }
-      return [x1, m - x1];
+      return x1;
     }
     // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
     let r = modPow(n, (p + 1n) / 4n, p);
@@ -88,15 +84,37 @@ function getSquareRootsModuloPrimeBig(n, p, e = 1) {
       if (r > p - r) {
         r = p - r;
       }
-      return [r, p - r];
+      return r;
     }
-    return [];
+    return -1n;
   }
   throw new RangeError('implemented only for primes of the form 4k+3');
 }
 
+function getSquareRootsModuloTwo(n, e = 1) {
+  if (e >= 3) {
+    if (n % 8 === 1) { // from Cohen H.
+      const m = Math.pow(2, e);
+      const candidate = getSquareRootsModuloTwo(n, e - 1)[0];
+      const candidate2 = m / 4 - candidate;
+      const r = (candidate * candidate) % m !== n ? candidate2 : candidate;
+      return [r, m / 2 - r, m / 2 + r, m - r];
+    }
+    return [];
+  }
+  if (e >= 2) {
+    if (n % 4 === 1) {
+      return [1, 3];
+    }
+    return [];
+  }
+  if (e >= 1) {
+    return [1];
+  }
+  return [];
+}
 
-function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
+function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
   n = Number(n);
   p = Number(p);
   e = Number(e);
@@ -105,55 +123,30 @@ function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
   if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER)))) { // + p is a prime number
     throw new RangeError();
   }
+  if (p % 2 === 0) {
+    throw new RangeError();
+  }
   // r**2 == n (mod p)
   if (e > 1) {
-    if (p === 2) {
-      if (e >= 3) {
-        if (n % 8 === 1) { // from Cohen H.
-          const candidates = getSquareRootsModuloPrime(n, p, e - 1);
-          let i = 0;
-          while ((candidates[i] * candidates[i]) % m !== n) {
-            i += 1;
-          }
-          const r = candidates[i];
-          return [r, m / 2 - r, m / 2 + r, m - r];
-        }
-        return [];
-      }
-      if (e >= 2) {
-        if (n % 4 === 1) {
-          return [1, 3];
-        }
-        return [];
-      }
-    } else {
-      const roots = getSquareRootsModuloPrime(n, p, e - 1);
-      if (roots.length === 0) {
-        return [];
-      }
-      if (roots.length !== 2) {
-        throw new Error();
-      }
-      const x = roots[0];
-      // x**2 = n mod p**(e - 1)
-      // x1 = x + a * p**(e-1)
-      // x1**2 = x**2 + (a * p**(e-1))**2 + 2*x*a*p**(e-1) = n mod p**e
-      // a*p**(e-1) = (n - x**2) * (2*x)**-1 mod p**e
-      let x1 = x + ((n - x * x) % m * modInverseSmall(2 * x, m)) % m;
-      if (x1 >= m) {
-        x1 -= m;
-      }
-      if (x1 < 0) {
-        x1 += m;
-      }
-      if (x1 > m - x1) {
-        x1 = m - x1;
-      }
-      return [x1, m - x1];
+    const x = squareRootModuloOddPrime(n, p, e - 1);
+    if (x === -1) {
+      return [];
     }
-  }
-  if (p % 2 === 0) {
-    return [1];
+    // x**2 = n mod p**(e - 1)
+    // x1 = x + a * p**(e-1)
+    // x1**2 = x**2 + (a * p**(e-1))**2 + 2*x*a*p**(e-1) = n mod p**e
+    // a*p**(e-1) = (n - x**2) * (2*x)**-1 mod p**e
+    let x1 = x + ((n - x * x) % m * modInverseSmall(2 * x, m)) % m;
+    if (x1 >= m) {
+      x1 -= m;
+    }
+    if (x1 < 0) {
+      x1 += m;
+    }
+    if (x1 > m - x1) {
+      x1 = m - x1;
+    }
+    return x1;
   }
   if ((p + 1) % 4 === 0) {
     // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
@@ -162,7 +155,7 @@ function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
       if (r > p - r) {
         r = p - r;
       }
-      return [r, p - r];
+      return r;
     }
   }
   let rrmnmodp = 1 - n; // r**2 % p - n
@@ -173,10 +166,10 @@ function getSquareRootsModuloPrime(n, p, e = 1) { // slow for non-small p
     }
     if (rrmnmodp === 0) {
       const r = Math.floor((tworm1 + 1) / 2);
-      return [r, p - r];
+      return r;
     }
   }
-  return [];
+  return -1;
 }
 
 function bitLength(x) {
@@ -555,7 +548,7 @@ QuadraticPolynomial.prototype.calculateNewPolynomial = function (M, primes, N) {
     return new QuadraticPolynomial(0n, 0n, 0n, q, 0n, 0n).calculateNewPolynomial(M, primes, N);
   }
   const A = q * q;
-  const B = getSquareRootsModuloPrimeBig(N, q, 2)[0];
+  const B = squareRootModuloOddPrimeBig(N, q, 2);
   const AC = (B * B - N);
   if (AC % A !== 0n) {
     throw new Error();
@@ -610,28 +603,41 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
       if (nmodpInBeta % p === 0) {
         console.warn('N has a factor in prime base', N, p);
       } else {
-        const roots = getSquareRootsModuloPrime(nmodpInBeta, p, beta);
-        for (let j = 0; j < roots.length; j += 1) {
-          wheels.push({root: roots[j], proot: 0, log2p: Math.log2(p), step: pInBeta});
+        if (p === 2) {
+          const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
+          for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
+            wheels.push({root: roots[j], proot: 0, proot2: 0, log2p: Math.log2(p) * (pInBeta === 2 ? 0.5 : 1), step: pInBeta});
+          }
+        } else {
+          const root = squareRootModuloOddPrime(nmodpInBeta, p, beta);
+          if (root === -1) {
+            throw new TypeError();
+          }
+          wheels.push({root: root, proot: 0, proot2: 0, log2p: Math.log2(p), step: pInBeta});
         }
       }
     }
   }
 
-  const lpStrategy = function (p, X, Y) {
+  const lpStrategy = function (p, polynomial, x) {
     // https://ru.wikipedia.org/wiki/Алгоритм_Диксона#Стратегия_LP
     const lp = largePrimes.get(p);
     if (lp == undefined) {
-      largePrimes.set(p, {X: X, Y: Y});
+      // storing polynomial + x has smaller memory usage
+      largePrimes.set(p, {polynomial: polynomial, x: x});
     } else {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
       if (sInverse === 0n) {
         return new CongruenceOfsquareOfXminusYmoduloN(s, 0n, N, null);//?
       } else {
-        const X1 = (sInverse * lp.X * X) % N;
-        if (Y % s === 0n && lp.Y % s === 0n) {
-          const a = lp.Y / s;
+        const X = polynomial.X(x);
+        const Y = polynomial.Y(x);
+        const lpX = lp.polynomial.X(lp.x);
+        const lpY = lp.polynomial.Y(lp.x);
+        const X1 = (sInverse * lpX * X) % N;
+        if (Y % s === 0n && lpY % s === 0n) {
+          const a = lpY / s;
           const b = Y / s;
           const Y1 = a * b;
           const fa = getSmoothFactorization(a, primes);
@@ -654,7 +660,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     for (let i = 0; i < wheels.length; i += 1) {
       const wheel = wheels[i];
       const pInBeta = wheel.step;
-      wheel.proot = wheel.root - Number(baseOffset % BigInt(pInBeta));
+      const offset = Number(baseOffset % BigInt(pInBeta));
+      wheel.proot = +wheel.root - offset;
+      wheel.proot2 = -wheel.root - offset;
     }
   } else {
     polynomial = new QuadraticPolynomial(1n, 0n, -N, 1n, 1n, N);
@@ -679,19 +687,18 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
       }
       const proot1 = fmod((-b + w.root) * invA, pInBeta) | 0;
       w.proot = proot1;
-      if (i >= 1 && wheels[i - 1].step === pInBeta && wheels[i - 1].root === pInBeta - w.root) {
-        const proot2 = fmod((-b - w.root) * invA, pInBeta) | 0;
-        wheels[i - 1].proot = proot2;
-        i -= 1;
-      }
+      const proot2 = fmod((-b - w.root) * invA, pInBeta) | 0;
+      w.proot2 = proot2;
     }
     if (false) {
       for (let k = 0; k < wheels.length; k += 1) {
-        const x = BigInt(wheels[k].proot);
-        const X = (polynomial.A * x + polynomial.B);
-        const Y = X * X - N;
-        if (Y % BigInt(wheels[k].step) !== 0n) {
-          throw new Error();
+        for (let v = 0; v <= 1; v += 1) {
+          const x = BigInt(v === 0 ? wheels[k].proot : wheels[k].proot2);
+          const X = (polynomial.A * x + polynomial.B);
+          const Y = X * X - N;
+          if (Y % BigInt(wheels[k].step) !== 0n) {
+            throw new Error();
+          }
         }
       }
     }
@@ -703,12 +710,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
     }
     for (let j = 0; j < wheels.length; j += 1) {
       const w = wheels[j];
-      const root = w.proot;
+      const root1 = w.proot;
+      const root2 = w.proot2;
       const log2p = w.log2p;
       const step = w.step;
-      const start = (root - offset) - Math.floor((root - offset) / step) * step;
-      for (let kpplusr = start; kpplusr < sieveSize; kpplusr += step) {
-        SIEVE[kpplusr] += log2p;
+      for (let k = 0; k <= 1; k += 1) {
+        const root = k === 0 ? root1 : root2;
+        const start = (root - offset) - Math.floor((root - offset) / step) * step;
+        for (let kpplusr = start; kpplusr < sieveSize; kpplusr += step) {
+          SIEVE[kpplusr] += log2p;
+        }
       }
     }
   };
@@ -746,10 +757,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
 
           const value = SIEVE[i];
           if (thresholdApproximation < value) {
-            const X = polynomial.X(i + offset);
-            const Y = polynomial.Y(i + offset);
             const threshold = polynomial.log2AbsY(i + offset) - twoB;
             if (threshold + twoB - 1 < value) {
+              const X = polynomial.X(i + offset);
+              const Y = polynomial.Y(i + offset);
               const factorization = getSmoothFactorization(Y, primes);
               if (factorization != null) {
                 return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization), done: false};
@@ -758,16 +769,18 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize) {
                 /*let p = 1n;
                 for (let n = 0; n < wheels.length; n += 1) {
                   const w = wheels[n];
-                  if ((i + offset - wheels[n].proot) % w.step === 0) {
-                    console.log(w);
-                    p *= BigInt(w.step);
+                  for (let v = 0; v <= 1; v += 1) {
+                    if ((i + offset - (v === 0 ? wheels[n].proot : wheels[n].proot2)) % w.step === 0) {
+                      console.log(w);
+                      p *= BigInt(w.step);
+                    }
                   }
                 }*/
               }
             } else {
               if (threshold < value) {
                 const p = Math.round(exp2(threshold + twoB - value));
-                const c = lpStrategy(p, X, Y);
+                const c = lpStrategy(p, polynomial, i + offset);
                 if (c != null) {
                   return {value: c, done: false};
                 }
@@ -859,8 +872,8 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
 QuadraticSieveFactorization.testables = {
   isPrime: isPrime,
   congruencesUsingQuadraticSieve: congruencesUsingQuadraticSieve,
-  getSquareRootsModuloPrime: getSquareRootsModuloPrime,
-  getSquareRootsModuloPrimeBig: getSquareRootsModuloPrimeBig,
+  squareRootModuloOddPrime: squareRootModuloOddPrime,
+  squareRootModuloOddPrimeBig: squareRootModuloOddPrimeBig,
   isQuadraticResidueModuloPrime: isQuadraticResidueModuloPrime,
   isQuadraticResidueModuloPrimeBig: isQuadraticResidueModuloPrimeBig,
   solve: solve,
