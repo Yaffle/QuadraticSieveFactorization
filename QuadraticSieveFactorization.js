@@ -569,8 +569,8 @@ QuadraticPolynomial.prototype.log2AbsY = function (x) {
 };
 
 
-function thresholdApproximationInterval(polynomial, x, threshold) {
-  let w = 256;
+function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
+  let w = sieveSize > 2048 ? (sieveSize > 2**18 ? 1024 : 256) : 1;
   while (w >= 2 && Math.abs(polynomial.log2AbsY(x + w) - threshold) > 0.5) {
     w /= 2;
   }
@@ -738,6 +738,31 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
+  const smoothEntries = [];
+  const smoothEntries2 = [];
+  const findSmoothEntries = function (offset, polynomial) {
+    smoothEntries.length = 0;
+    smoothEntries2.length = 0;
+    let j = 0;
+    let thresholdApproximation = 0.5;
+    while (j < sieveSize) {
+      const k = j;
+      // it is slow to compute the threshold on every iteration, so trying to optimize:
+
+      //TODO: the threshold calculation is much more simple in the Youtube videos (?)
+      thresholdApproximation = polynomial.log2AbsY(j + offset) - twoB;
+      j = thresholdApproximationInterval(polynomial, j + offset, thresholdApproximation + twoB, sieveSize) - offset;
+      j = j > sieveSize ? sieveSize : j;
+
+      for (let i = k; i < j; i += 1) {
+        if (thresholdApproximation < SIEVE[i]) {
+          smoothEntries.push(i + offset);
+          smoothEntries2.push(SIEVE[i]);
+        }
+      }
+    }
+  };
+
   let i1 = -1;
   let k = 0;
   const iterator = {
@@ -756,26 +781,20 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           }
 
           updateSieve(offset);
+          
+          findSmoothEntries(offset, polynomial);
+          
         }
 
-        let j = -1;
-        let thresholdApproximation = 0.5;
-        let i = i1;
-        while ((i += 1) < sieveSize) {
-          // it is slow to compute the threshold on every iteration, so trying to optimize:
 
-          //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-          if (i >= j && sieveSize >= 2048) {
-            thresholdApproximation = polynomial.log2AbsY(i + offset) - twoB;
-            j = thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation + twoB) - offset;
-          }
-
-          const value = SIEVE[i];
-          if (thresholdApproximation < value) {
-            const threshold = polynomial.log2AbsY(i + offset) - twoB;
-            if (threshold + twoB - 1 < value) {
-              const X = polynomial.X(i + offset);
-              const Y = polynomial.Y(i + offset);
+          //Note: separate loop over "smooth entries" is better for performance, seems
+          for (let i = i1 + 1; i < smoothEntries.length; i += 1) {
+            const x = smoothEntries[i];
+            const value = smoothEntries2[i];
+            const threshold = polynomial.log2AbsY(x);
+            if (threshold - value < 1) {
+              const X = polynomial.X(x);
+              const Y = polynomial.Y(x);
               const factorization = getSmoothFactorization(Y, primes);
               if (factorization != null) {
                 i1 = i;
@@ -786,7 +805,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 for (let n = 0; n < wheels.length; n += 1) {
                   const w = wheels[n];
                   for (let v = 0; v <= 1; v += 1) {
-                    if ((i + offset - (v === 0 ? wheels[n].proot : wheels[n].proot2)) % w.step === 0) {
+                    if ((x - (v === 0 ? wheels[n].proot : wheels[n].proot2)) % w.step === 0) {
                       console.log(w);
                       p *= BigInt(w.step);
                     }
@@ -794,9 +813,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 }*/
               }
             } else {
-              if (threshold < value) {
-                const p = Math.round(exp2(threshold + twoB - value));
-                const c = lpStrategy(p, polynomial, i + offset);
+              if (threshold - value < twoB) {
+                const p = Math.round(exp2(threshold - value));
+                const c = lpStrategy(p, polynomial, x);
                 if (c != null) {
                   i1 = i;
                   return {value: c, done: false};
@@ -804,7 +823,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
               }
             }
           }
-        }
         i1 = sieveSize;
       }
       return {value: undefined, done: true};
