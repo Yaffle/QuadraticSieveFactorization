@@ -368,7 +368,7 @@ function packedArray(n) {
   return array;
 }
 function BitSet(size) {
-  const n = Math.ceil(size / BitSetWordSize);
+  const n = Math.ceil(size / (4 * BitSetWordSize)) * 4;
   this.data = packedArray(n);
   this.size = size;
 }
@@ -404,16 +404,20 @@ BitSet.prototype.xor = function (other) {
   const a = this.data;
   const b = other.data;
   const n = a.length;
-  if (n !== b.length) {
+  if (n !== b.length || n % 4 !== 0) {
     throw new RangeError();
   }
-  for (let i = 0; i < n; i += 1) {
-    a[i] ^= b[i];
+  for (let i = 0; i < n; i += 4) {
+    a[i + 0] ^= b[i + 0];
+    a[i + 1] ^= b[i + 1];
+    a[i + 2] ^= b[i + 2];
+    a[i + 3] ^= b[i + 3];
   }
 };
 BitSet.prototype.toString = function () {
   return this.data.map(x => (x >>> 0).toString(2).padStart(BitSetWordSize, '0').split('').reverse().join('')).join('').slice(0, this.size);
 };
+
 
 // pass factorizations with associated values to the next call
 // returns linear combinations of vectors which result in zero vector by modulo 2
@@ -714,22 +718,33 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     for (let j = 0; j < wheels.length; j += 1) {
       const w = wheels[j];
-      const root1 = w.proot;
-      const root2 = w.proot2;
       const log2p = w.log2p;
       const step = w.step;
-      for (let k = 0; k <= 1; k += 1) {
-        const root = k === 0 ? root1 : root2;
-        const x = (root - offset - segmentStart);
-        const start = segmentStart + (x - Math.floor(x / step) * step);
-        for (let kpplusr = start; kpplusr < segmentEnd; kpplusr += step) {
-          SIEVE[kpplusr] += log2p;
-        }
+      let kpplusr = w.proot;
+      while (kpplusr < segmentEnd) {
+        SIEVE[kpplusr] += log2p;
+        kpplusr += step;
       }
+      w.proot = kpplusr;
+      let kpplusr2 = w.proot2;
+      while (kpplusr2 < segmentEnd) {
+        SIEVE[kpplusr2] += log2p;
+        kpplusr2 += step;
+      }
+      w.proot2 = kpplusr2;
     }
   };
 
   const updateSieve = function (offset) {
+    for (let j = 0; j < wheels.length; j += 1) {
+      const w = wheels[j];
+      const step = w.step;
+      const x = (w.proot - offset) % step;
+      w.proot = x + (x < 0 ? step : 0);
+      const x2 = (w.proot2 - offset) % step;
+      w.proot2 = x2 + (x2 < 0 ? step : 0);
+    }
+
     // updateSieveSegment(offset, 0, sieveSize);
     const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
     for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
@@ -881,13 +896,14 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     solutions.next();
     let c = null;
     let c1 = 0;
-    let start = Date.now();
+    const start = Date.now();
     let last = start;
     while ((c = congruences.next().value) != undefined) {
       c1 += 1;
-      if (Date.now() - last > 5000) {
-        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (Date.now() - start) / c1 * primeBase.length);
-        last = Date.now();
+      const now = Date.now();
+      if (now - last > 5000) {
+        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length);
+        last = now;
       }
       const solution = c.Y === 0n ? [c] : solutions.next([c.factorization.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p))), c]).value;
       if (solution != null) {

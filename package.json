@@ -1,6 +1,6 @@
 {
   "name": "quadraticsievefactorization",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Quadratic Sieve integer factorization method for JavaScript bigints",
   "main": "QuadraticSieveFactorization.js",
   "scripts": {
