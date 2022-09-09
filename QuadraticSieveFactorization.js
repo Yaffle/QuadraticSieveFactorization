@@ -597,13 +597,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (typeof N !== 'bigint') {
     throw new RangeError();
   }
-  const SIEVE = new Array(sieveSize).fill(-0);
+  const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
+  const SIEVE_SEGMENT = new Array(segmentSize).fill(-0);
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels = [];
+  const wheelLogs = [];
   for (let i = 0; i < primes.length; i += 1) {
     const p = primes[i];
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
@@ -614,14 +616,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (p === 2) {
           const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
           for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
-            wheels.push({root: roots[j], proot: 0, proot2: 0, log2p: Math.log2(p) * (pInBeta === 2 ? 0.5 : 1), step: pInBeta});
+            wheels.push({root: roots[j], proot: 0, proot2: 0, step: pInBeta});
+            wheelLogs.push(Math.log2(p) * (pInBeta === 2 ? 0.5 : 1));
           }
         } else {
           const root = squareRootModuloOddPrime(nmodpInBeta, p, beta);
           if (root === -1) {
             throw new TypeError();
           }
-          wheels.push({root: root, proot: 0, proot2: 0, log2p: Math.log2(p), step: pInBeta});
+          wheels.push({root: root, proot: 0, proot2: 0, step: pInBeta});
+          wheelLogs.push(Math.log2(p));
         }
       }
     }
@@ -712,67 +716,47 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
   
-  const updateSieveSegment = function (offset, segmentStart, segmentEnd) {
-    for (let j = segmentStart; j < segmentEnd; j += 1) {
-      SIEVE[j] = -0;
+  const updateSieveSegment = function () {
+    for (let j = 0; j < segmentSize; j += 1) {
+      SIEVE_SEGMENT[j] = -0;
     }
     for (let j = 0; j < wheels.length; j += 1) {
       const w = wheels[j];
-      const log2p = w.log2p;
       const step = w.step;
+      const log2p = wheelLogs[j];
       let kpplusr = w.proot;
-      while (kpplusr < segmentEnd) {
-        SIEVE[kpplusr] += log2p;
+      while (kpplusr < segmentSize) {
+        SIEVE_SEGMENT[kpplusr] += log2p;
         kpplusr += step;
       }
-      w.proot = kpplusr;
+      w.proot = kpplusr - segmentSize;
       let kpplusr2 = w.proot2;
-      while (kpplusr2 < segmentEnd) {
-        SIEVE[kpplusr2] += log2p;
+      while (kpplusr2 < segmentSize) {
+        SIEVE_SEGMENT[kpplusr2] += log2p;
         kpplusr2 += step;
       }
-      w.proot2 = kpplusr2;
-    }
-  };
-
-  const updateSieve = function (offset) {
-    for (let j = 0; j < wheels.length; j += 1) {
-      const w = wheels[j];
-      const step = w.step;
-      const x = (w.proot - offset) % step;
-      w.proot = x + (x < 0 ? step : 0);
-      const x2 = (w.proot2 - offset) % step;
-      w.proot2 = x2 + (x2 < 0 ? step : 0);
-    }
-
-    // updateSieveSegment(offset, 0, sieveSize);
-    const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
-    for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
-      const segmentEnd = Math.min(segmentStart + segmentSize, sieveSize);
-      updateSieveSegment(offset, segmentStart, segmentEnd);
+      w.proot2 = kpplusr2 - segmentSize;
     }
   };
 
   const smoothEntries = [];
   const smoothEntries2 = [];
   const findSmoothEntries = function (offset, polynomial) {
-    smoothEntries.length = 0;
-    smoothEntries2.length = 0;
     let j = 0;
     let thresholdApproximation = 0.5;
-    while (j < sieveSize) {
+    while (j < segmentSize) {
       const k = j;
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
       thresholdApproximation = polynomial.log2AbsY(j + offset) - twoB;
       j = thresholdApproximationInterval(polynomial, j + offset, thresholdApproximation + twoB, sieveSize) - offset;
-      j = j > sieveSize ? sieveSize : j;
+      j = j > segmentSize ? segmentSize : j;
 
       for (let i = k; i < j; i += 1) {
-        if (thresholdApproximation < SIEVE[i]) {
+        if (thresholdApproximation < SIEVE_SEGMENT[i]) {
           smoothEntries.push(i + offset);
-          smoothEntries2.push(SIEVE[i]);
+          smoothEntries2.push(SIEVE_SEGMENT[i]);
         }
       }
     }
@@ -795,9 +779,22 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             updateWheels(polynomial);
           }
 
-          updateSieve(offset);
-          
-          findSmoothEntries(offset, polynomial);
+          smoothEntries.length = 0;
+          smoothEntries2.length = 0;
+
+          for (let j = 0; j < wheels.length; j += 1) {
+            const w = wheels[j];
+            const step = w.step;
+            const x = (w.proot - offset) % step;
+            w.proot = x + (x < 0 ? step : 0);
+            const x2 = (w.proot2 - offset) % step;
+            w.proot2 = x2 + (x2 < 0 ? step : 0);
+          }
+
+          for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
+            updateSieveSegment();
+            findSmoothEntries(offset + segmentStart, polynomial);
+          }
           
         }
 
