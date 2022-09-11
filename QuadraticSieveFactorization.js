@@ -526,7 +526,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   };
   const sqrtOfA = BigInt(sqrt(BigInt(sqrt(2n * N)) / BigInt(M)));//TODO: !?
   const e = log(sqrtOfA) / Math.log(2);
-  const k = Math.ceil(e / (53 / 4)); // number of small primes
+  const k = Math.max(1, Math.ceil(e / (53 / 4))); // number of small primes
   console.log(k);
   const p = Math.round(e <= 1023n ? Math.pow(Number(sqrtOfA), 1 / k) : Math.pow(Number(sqrtOfA >> (e - 1023n)), 1 / k) * Math.pow(2, Number(e - 1023n) / k));
   //const B = BigInt(primes[primes.length - 1]);
