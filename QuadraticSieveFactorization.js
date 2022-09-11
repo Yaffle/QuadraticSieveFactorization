@@ -1,5 +1,4 @@
 /*jshint esversion:6*/
-import isPrime from './isPrime.js';
 
 function modInverse(a, m) {
   a = BigInt(a);
@@ -54,41 +53,35 @@ function modInverseSmall(a, m) {
   return oldS < 0 ? oldS + m : oldS;
 }
 
-function squareRootModuloOddPrimeBig(n, p, e = 1) {
-  n = BigInt(n);
-  p = BigInt(p);
-  e = Number(e);
-  const m = e === 1 ? p : (e === 2 ? p * p : 0n); // p**BigInt(e)
-  n %= m;
-  if (!(n > 0n && p > 0n && e >= 1 && n % p !== 0n)) { // + p is a prime number
-    throw new RangeError();
-  }
-  if ((p + 1n) % 4n === 0n) {
-    if (e !== 1) {
-      const x = squareRootModuloOddPrimeBig(n, p, e - 1);
-      if (x === -1n) {
-        return -1n;
-      }
-      let x1 = (x + (n - (x * x) % m) * modInverse(x + x, m)) % m;
-      if (x1 < 0n) {
-        x1 += m;
-      }
-      if (x1 > m - x1) {
-        x1 = m - x1;
-      }
-      return x1;
+function ChineseRemainderTheorem(r1, r2, m1, m2) {
+  // https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Case_of_two_moduli
+  // x = r1 (mod m1)
+  // x = r2 (mod m2)
+  const c = modInverse(m1 % m2, m2);
+  return r1 + (((r2 - r1) * c) % m2) * m1;
+}
+
+function squareRootsModuloOddPrimesProduct(n, primes, e = 1) {
+  // Chinese Remainder Theorem idea from https://en.wikipedia.org/wiki/Quadratic_residue#Complexity_of_finding_square_roots
+  let result = [];
+  result.push(0n);
+  let P = 1n;
+  for (let i = 0; i < primes.length; i++) {
+    if (primes[i]**e > 2**53) {
+      throw new RangeError();
     }
-    // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
-    let r = modPow(n, (p + 1n) / 4n, p);
-    if ((r * r) % p === n) {
-      if (r > p - r) {
-        r = p - r;
-      }
-      return r;
+    const x2 = BigInt(squareRootModuloOddPrime(Number(n % BigInt(primes[i]**e)), primes[i], e));
+    const result2 = [];
+    const p = BigInt(primes[i]**e);
+    for (let j = 0; j < result.length; j++) {
+      const x1 = result[j];
+      result2.push(ChineseRemainderTheorem(x1, x2, P, p));
+      result2.push(ChineseRemainderTheorem(x1, -x2, P, p));
     }
-    return -1n;
+    P *= p;
+    result = result2;
   }
-  throw new RangeError('implemented only for primes of the form 4k+3');
+  return result;
 }
 
 function getSquareRootsModuloTwo(n, e = 1) {
@@ -120,7 +113,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
   e = Number(e);
   const m = Math.pow(p, e);
   n = n % m;
-  if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER)))) { // + p is a prime number
+  if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
     throw new RangeError();
   }
   if (p % 2 === 0) {
@@ -129,14 +122,15 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
   // r**2 == n (mod p)
   if (e > 1) {
     const x = squareRootModuloOddPrime(n, p, e - 1);
-    if (x === -1) {
-      return [];
-    }
     // x**2 = n mod p**(e - 1)
     // x1 = x + a * p**(e-1)
     // x1**2 = x**2 + (a * p**(e-1))**2 + 2*x*a*p**(e-1) = n mod p**e
     // a*p**(e-1) = (n - x**2) * (2*x)**-1 mod p**e
-    let x1 = x + ((n - x * x) % m * modInverseSmall(2 * x, m)) % m;
+    let inv = modInverseSmall(2 * x, m) % m;
+    let v = (n - x * x) % m;
+    inv = inv > m / 2 ? inv - m : inv; // use sign bit
+    v = v > m / 2 ? v - m : v; // use sign bit
+    let x1 = x + (v * inv) % m;
     if (x1 >= m) {
       x1 -= m;
     }
@@ -169,7 +163,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
       return r;
     }
   }
-  return -1;
+  throw new RangeError();
 }
 
 function bitLength(x) {
@@ -269,24 +263,6 @@ function isQuadraticResidueModuloPrime(a, p) {
   return value === 1;
 }
 
-function isQuadraticResidueModuloPrimeBig(a, p) {
-  a = BigInt(a);
-  p = BigInt(p);
-  if (p === 2n) {
-    // "Modulo 2, every integer is a quadratic residue." - https://en.wikipedia.org/wiki/Quadratic_residue#Prime_modulus
-    return true;
-  }
-  // https://en.wikipedia.org/wiki/Euler%27s_criterion
-  const amodp = a % p;
-  if (amodp === 0n) {
-    return true;
-  }
-  console.assert(p % 2n === 1n);
-  const value = modPow(amodp, (p - 1n) / 2n, p);
-  console.assert(value === 1n || value === p - 1n);
-  return value === 1n;
-}
-
 function log(N) {
   const e = Math.max(Number(bitLength(N)) - 4 * 12, 0);
   const lnn = Math.log(Number(N >> BigInt(e))) + Math.log(2) * e;
@@ -318,23 +294,6 @@ function modPowSmall(base, exponent, modulus) {
       base = (base * base) % modulus;
     } else {
       exponent -= 1;
-      accumulator = (accumulator * base) % modulus;
-    }
-  }
-  return accumulator;
-}
-
-function modPow(base, exponent, modulus) {
-  base = BigInt(base);
-  exponent = BigInt(exponent);
-  modulus = BigInt(modulus);
-  let accumulator = 1n;
-  while (exponent !== 0n) {
-    if (exponent % 2n === 0n) {
-      exponent /= 2n;
-      base = (base * base) % modulus;
-    } else {
-      exponent -= 1n;
       accumulator = (accumulator * base) % modulus;
     }
   }
@@ -508,6 +467,7 @@ function FastMod(array, integer) {
   return result | 0;
 }
 
+//squareRootModuloOddPrime(4865648, 9749, 2)  // huge size of p**e
 
 function exp2(x) {
   return Math.pow(2, Math.floor(x)) * Math.exp(Math.LN2 * (x - Math.floor(x)));
@@ -530,35 +490,95 @@ function QuadraticPolynomial(A, B, C, q, qInv, N) {
   this.x2 = u + v;
   this.log2a = logA / Math.LN2;
 }
-
-QuadraticPolynomial.prototype.calculateNewPolynomial = function (M, primes, N) {
-  let q = this.q;
-  if (q === 1n) {
-    q = BigInt(sqrt(BigInt(sqrt(2n * N)) / BigInt(M)));//TODO: !?
-    const B = BigInt(primes[primes.length - 1]);
-    if (q <= B) {
-      q = B + 2n;
+QuadraticPolynomial.generator = function (M, primes, N) {
+  const isPrime = function (n) {
+    if (typeof n !== "number" || n < 2) {
+      throw new RangeError();
     }
-    q += 3n - q % 4n;
-  } else {
-    q += 4n;
-  }
-  while (!isPrime(q) || !isQuadraticResidueModuloPrimeBig(N, q)) {
-    q += 4n;
-  }
-  const qInv = modInverse(q % N, N);
-  if (qInv === 0n) {
-    //TODO: what to do here - ?
-    return new QuadraticPolynomial(0n, 0n, 0n, q, 0n, 0n).calculateNewPolynomial(M, primes, N);
-  }
-  const A = q * q;
-  const B = squareRootModuloOddPrimeBig(N, q, 2);
-  const AC = (B * B - N);
-  if (AC % A !== 0n) {
-    throw new Error();
-  }
-  const C = AC / A;
-  return new QuadraticPolynomial(A, B, C, q, qInv, N);
+    if (n % 2 === 0) {
+      return n === 2;
+    }
+    if (n % 3 === 0) {
+      return n === 3;
+    }
+    for (let i = 5, max = Math.floor(Math.sqrt(Number(n))); i <= max; i += 6) {
+      if (n % i === 0) {
+        return false;
+      }
+      if (n % (i + 2) === 0) {
+        return false;
+      }
+    }
+    return true;
+  };
+  // see https://www.cs.virginia.edu/crab/QFS_Simple.pdf for multiple primes optimization
+  const getCombinations = function (elements, k) {
+    if (elements.length === 0) {
+      return [];
+    }
+    if (k === 0) {
+      return [[]];
+    }
+    if (k === 1) {
+      return elements.map(e => [e]);
+    }
+    return getCombinations(elements.slice(1), k - 1).map(c => [elements[0]].concat(c)).concat(getCombinations(elements.slice(1), k));
+  };
+  const sqrtOfA = BigInt(sqrt(BigInt(sqrt(2n * N)) / BigInt(M)));//TODO: !?
+  const e = log(sqrtOfA) / Math.log(2);
+  const k = Math.ceil(e / (53 / 4)); // number of small primes
+  console.log(k);
+  const p = Math.round(e <= 1023n ? Math.pow(Number(sqrtOfA), 1 / k) : Math.pow(Number(sqrtOfA >> (e - 1023n)), 1 / k) * Math.pow(2, Number(e - 1023n) / k));
+  //const B = BigInt(primes[primes.length - 1]);
+  //if (p <= B) {
+  //  p = B + 2n;
+  //}
+  //p += 3 - p % 4;
+  let s = 0;
+  let combinations = [];
+  const polynomials = [];
+  const elements = [];
+  globalThis.polynomialsCounter = 1;
+  return {
+    next: function generator() {
+      while (polynomials.length === 0) {
+        while (combinations.length === 0) {
+          let p3 = 0;
+          do {
+            p3 = p - p % 2 + 1 + (s % 2 === 0 ? s : (-1 - s));
+            s += 1;
+          } while (p3 < 2 || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
+          combinations = getCombinations(elements, k - 1).map(c => [p3].concat(c));
+          elements.push(p3);
+          //console.log(elements.length, combinations.length, p**k / Number(sqrtOfA));
+        }
+        const qPrimes = combinations.pop();
+        const q = product(qPrimes.map(p => BigInt(p)));
+        const qInv = modInverse(q % N, N);
+        if (qInv === 0n) {
+          //TODO: what to do here - ?
+          return this.next();
+        }
+        const A = q * q;
+        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 2);
+        for (let i = 0; i < Bs.length; i++) {
+          Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
+        }
+        Bs.sort((a, b) => Number(a - b));
+        for (let i = 0; i < Bs.length / 2; i += 1) {
+          const B = Bs[i];
+          const AC = (B * B - N);
+          if (AC % A !== 0n) {
+            throw new Error();
+          }
+          const C = AC / A;
+          polynomials.push(new QuadraticPolynomial(A, B, C, q, qInv, N));
+        }
+      }
+      globalThis.polynomialsCounter += 1;
+      return polynomials.shift();
+    }
+  };
 };
 QuadraticPolynomial.prototype.X = function (x) {
   return (this.A * BigInt(x) + this.B) * this.qInv;
@@ -571,7 +591,6 @@ QuadraticPolynomial.prototype.log2AbsY = function (x) {
   const v2 =  Math.log2(Math.abs((x - this.x1) * (x - this.x2))) + this.log2a;
   return v2;
 };
-
 
 function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
   let w = sieveSize > 2048 ? (sieveSize > 2**18 ? 1024 : 256) : 1;
@@ -598,7 +617,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     throw new RangeError();
   }
   const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
-  const SIEVE_SEGMENT = new Array(segmentSize).fill(-0);
+  const SIEVE_SEGMENT = [];
+  for (let i = 0; i < segmentSize; i += 1) {
+    SIEVE_SEGMENT.push(-0);
+  }
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
   const largePrimes = new Map(); // faster (?)
@@ -606,6 +628,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels = [];
   const wheelLogs = [];
+  const wheelRoots = [];
   for (let i = 0; i < primes.length; i += 1) {
     const p = primes[i];
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
@@ -616,16 +639,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (p === 2) {
           const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
           for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
-            wheels.push({root: roots[j], proot: 0, proot2: 0, step: pInBeta});
+            wheels.push({proot: 0, proot2: 0, step: pInBeta});
             wheelLogs.push(Math.log2(p) * (pInBeta === 2 ? 0.5 : 1));
+            wheelRoots.push(roots[j] | 0);
           }
         } else {
           const root = squareRootModuloOddPrime(nmodpInBeta, p, beta);
-          if (root === -1) {
-            throw new TypeError();
-          }
-          wheels.push({root: root, proot: 0, proot2: 0, step: pInBeta});
+          wheels.push({proot: 0, proot2: 0, step: pInBeta});
           wheelLogs.push(Math.log2(p));
+          wheelRoots.push(root | 0);
         }
       }
     }
@@ -664,6 +686,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     return null;
   };
 
+  const polynomialGenerator = useMultiplePolynomials ? QuadraticPolynomial.generator(sieveSize / 2, primes, N) : null;
   let polynomial = null;
   if (!useMultiplePolynomials) {
     // - Number(baseOffset % BigInt(pInBeta))
@@ -673,12 +696,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const wheel = wheels[i];
       const pInBeta = wheel.step;
       const offset = Number(baseOffset % BigInt(pInBeta));
-      wheel.proot = +wheel.root - offset;
-      wheel.proot2 = -wheel.root - offset;
+      wheel.proot = +wheelRoots[i] - offset;
+      wheel.proot2 = -wheelRoots[i] - offset;
     }
-  } else {
-    polynomial = new QuadraticPolynomial(1n, 0n, -N, 1n, 1n, N);
   }
+
+  let invCacheKey = 0n;
+  const invCache = packedArray(wheels.length / 3);
 
   const updateWheels = function (polynomial) {
     //recalculate roots based on the formulat:
@@ -686,22 +710,32 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //+some optimizations to minimize bigint usage and modInverseSmall calls
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
+    const useCache = polynomial.A === invCacheKey;
     for (let i = wheels.length - 1; i >= 0; i -= 1) {
       const w = wheels[i];
       const pInBeta = w.step;
-      //const a = Number(polynomial.A % BigInt(pInBeta));
-      //const b = Number(polynomial.B % BigInt(pInBeta));
-      const a = FastMod(AA, pInBeta);
-      const b = FastMod(BB, pInBeta);
-      const invA = modInverseSmall(a, pInBeta);
-      if (invA === 0) {
-        throw new Error('unsupported A');
+      let invA = 0n
+      if (!useCache) {
+        //const a = Number(polynomial.A % BigInt(pInBeta));
+        const a = FastMod(AA, pInBeta);
+        invA = modInverseSmall(a, pInBeta);
+        invCache[i] = invA;
+      } else {
+        invA = invCache[i];
       }
-      const proot1 = fmod((-b + w.root) * invA, pInBeta) | 0;
-      w.proot = proot1;
-      const proot2 = fmod((-b - w.root) * invA, pInBeta) | 0;
-      w.proot2 = proot2;
+      if (invA === 0) {
+        //console.log('unsupported A');
+        //TODO: ?
+      } else {
+        //const b = Number(polynomial.B % BigInt(pInBeta));
+        const b = FastMod(BB, pInBeta);
+        const proot1 = fmod((-b + wheelRoots[i]) * invA, pInBeta) | 0;
+        w.proot = proot1;
+        const proot2 = fmod((-b - wheelRoots[i]) * invA, pInBeta) | 0;
+        w.proot2 = proot2;
+      }
     }
+    invCacheKey = polynomial.A;
     if (false) {
       for (let k = 0; k < wheels.length; k += 1) {
         for (let v = 0; v <= 1; v += 1) {
@@ -775,7 +809,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (i1 === -1) {
 
           if (useMultiplePolynomials) {
-            polynomial = polynomial.calculateNewPolynomial(sieveSize / 2, primes, N);
+            polynomial = polynomialGenerator.next();
             updateWheels(polynomial);
           }
 
@@ -881,7 +915,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
-    const B = Math.min(Math.floor(Math.sqrt(L(kN) / 1.5)), (1 << 25) - 1);
+    const B = Math.min(Math.floor(Math.sqrt(L(kN) / 8)), (1 << 25) - 1);
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
@@ -919,12 +953,9 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
 }
 
 QuadraticSieveFactorization.testables = {
-  isPrime: isPrime,
   congruencesUsingQuadraticSieve: congruencesUsingQuadraticSieve,
   squareRootModuloOddPrime: squareRootModuloOddPrime,
-  squareRootModuloOddPrimeBig: squareRootModuloOddPrimeBig,
   isQuadraticResidueModuloPrime: isQuadraticResidueModuloPrime,
-  isQuadraticResidueModuloPrimeBig: isQuadraticResidueModuloPrimeBig,
   solve: solve,
   QuadraticPolynomial: QuadraticPolynomial,
   thresholdApproximationInterval: thresholdApproximationInterval
