@@ -66,14 +66,14 @@ function squareRootsModuloOddPrimesProduct(n, primes, e = 1) {
   let result = [];
   result.push(0n);
   let P = 1n;
-  for (let i = 0; i < primes.length; i++) {
-    if (primes[i]**e > 2**53) {
+  for (let i = 0; i < primes.length; i += 1) {
+    if (Math.pow(primes[i], e) > Number.MAX_SAFE_INTEGER) {
       throw new RangeError();
     }
-    const x2 = BigInt(squareRootModuloOddPrime(Number(n % BigInt(primes[i]**e)), primes[i], e));
+    const x2 = BigInt(squareRootModuloOddPrime(Number(n % BigInt(Math.pow(primes[i], e))), primes[i], e));
     const result2 = [];
-    const p = BigInt(primes[i]**e);
-    for (let j = 0; j < result.length; j++) {
+    const p = BigInt(Math.pow(primes[i], e));
+    for (let j = 0; j < result.length; j += 1) {
       const x1 = result[j];
       result2.push(ChineseRemainderTheorem(x1, x2, P, p));
       result2.push(ChineseRemainderTheorem(x1, -x2, P, p));
@@ -319,12 +319,13 @@ function primes(MAX) {
 const BitSetWordSize = 31; // see https://v8.dev/blog/pointer-compression
 
 function packedArray(n) {
+  // `%DebugPrint(array)` in `node --allow-native-syntax`
   // see https://v8.dev/blog/elements-kinds
   const array = [];
   for (let i = 0; i < n; i += 1) {
     array.push(0);
   }
-  return array;
+  return array.slice(0); // slice to reduce the size of the internal storage
 }
 function BitSet(size) {
   const n = Math.ceil(size / (4 * BitSetWordSize)) * 4;
@@ -464,7 +465,7 @@ function FastMod(array, integer) {
       result = fmod(result * x + array[i], integer);
     }
   }
-  return result | 0;
+  return result;
 }
 
 //squareRootModuloOddPrime(4865648, 9749, 2)  // huge size of p**e
@@ -527,7 +528,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   const sqrtOfA = BigInt(sqrt(BigInt(sqrt(2n * N)) / BigInt(M)));//TODO: !?
   const e = log(sqrtOfA) / Math.log(2);
   const k = Math.max(1, Math.ceil(e / (53 / 4))); // number of small primes
-  console.log(k);
+  //console.debug(k);
   const p = Math.round(e <= 1023n ? Math.pow(Number(sqrtOfA), 1 / k) : Math.pow(Number(sqrtOfA >> (e - 1023n)), 1 / k) * Math.pow(2, Number(e - 1023n) / k));
   //const B = BigInt(primes[primes.length - 1]);
   //if (p <= B) {
@@ -561,7 +562,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
         }
         const A = q * q;
         const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 2);
-        for (let i = 0; i < Bs.length; i++) {
+        for (let i = 0; i < Bs.length; i += 1) {
           Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
         }
         Bs.sort((a, b) => Number(a - b));
@@ -606,21 +607,23 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let sieveSize1 = Number(sieveSize0 || 0);
   if (sieveSize1 === 0) {
-    sieveSize1 = Math.pow(2, 18);
+    sieveSize1 = 3 * 2**14;
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
   }
+  //console.debug('sieveSize1', Math.log2(sieveSize1));
   sieveSize1 += sieveSize1 % 2;
   const sieveSize = sieveSize1;
 
   if (typeof N !== 'bigint') {
     throw new RangeError();
   }
-  const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / 2**18));
-  const SIEVE_SEGMENT = [];
+  const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / (3 * 2**17)));
+  const SIEVE_SEGMENT1 = [];
   for (let i = 0; i < segmentSize; i += 1) {
-    SIEVE_SEGMENT.push(-0);
+    SIEVE_SEGMENT1.push(-0);
   }
+  const SIEVE_SEGMENT = SIEVE_SEGMENT1.slice(0);
 
   const twoB = 2 * Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
   const largePrimes = new Map(); // faster (?)
@@ -639,13 +642,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (p === 2) {
           const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
           for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
-            wheels.push({proot: 0, proot2: 0, step: pInBeta});
+            wheels.push({step: pInBeta, proot: 0, proot2: 0});
             wheelLogs.push(Math.log2(p) * (pInBeta === 2 ? 0.5 : 1));
             wheelRoots.push(roots[j] | 0);
           }
         } else {
           const root = squareRootModuloOddPrime(nmodpInBeta, p, beta);
-          wheels.push({proot: 0, proot2: 0, step: pInBeta});
+          wheels.push({step: pInBeta, proot: 0, proot2: 0});
           wheelLogs.push(Math.log2(p));
           wheelRoots.push(root | 0);
         }
@@ -702,7 +705,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
 
   let invCacheKey = 0n;
-  const invCache = packedArray(wheels.length / 3);
+  const invCache = packedArray(wheels.length);
 
   const updateWheels = function (polynomial) {
     //recalculate roots based on the formulat:
@@ -714,10 +717,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     for (let i = wheels.length - 1; i >= 0; i -= 1) {
       const w = wheels[i];
       const pInBeta = w.step;
-      let invA = 0n
+      const root = wheelRoots[i];
+      let invA = 0;
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(pInBeta));
-        const a = FastMod(AA, pInBeta);
+        const a = FastMod(AA, pInBeta) | 0;
         invA = modInverseSmall(a, pInBeta);
         invCache[i] = invA;
       } else {
@@ -728,10 +732,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         //TODO: ?
       } else {
         //const b = Number(polynomial.B % BigInt(pInBeta));
-        const b = FastMod(BB, pInBeta);
-        const proot1 = fmod((-b + wheelRoots[i]) * invA, pInBeta) | 0;
+        const b = FastMod(BB, pInBeta) | 0;
+        const proot1 = fmod((0 - b + root) * invA, pInBeta) | 0;
         w.proot = proot1;
-        const proot2 = fmod((-b - wheelRoots[i]) * invA, pInBeta) | 0;
+        const proot2 = fmod((0 - b - root) * invA, pInBeta) | 0;
         w.proot2 = proot2;
       }
     }
