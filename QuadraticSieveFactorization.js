@@ -539,7 +539,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   let combinations = [];
   const polynomials = [];
   const elements = [];
-  globalThis.polynomialsCounter = 1;
+  QuadraticSieveFactorization.polynomialsCounter = 0;
   return {
     next: function generator() {
       while (polynomials.length === 0) {
@@ -576,7 +576,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
           polynomials.push(new QuadraticPolynomial(A, B, C, q, qInv, N));
         }
       }
-      globalThis.polynomialsCounter += 1;
+      QuadraticSieveFactorization.polynomialsCounter += 1;
       return polynomials.shift();
     }
   };
@@ -603,6 +603,8 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 
 // https://ru.wikipedia.org/wiki/Алгоритм_Диксона
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
+// https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
+
 
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let sieveSize1 = Number(sieveSize0 || 0);
@@ -753,27 +755,68 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
     }
   };
-  
-  const updateSieveSegment = function () {
-    for (let j = 0; j < segmentSize; j += 1) {
-      SIEVE_SEGMENT[j] = -0;
+
+  const getSmallWheels = function () {
+    const n = Math.min(64, wheels.length);
+    const indexes = new Array(n);
+    for (let i = 0; i < n; i += 1) {
+      indexes[i] = i;
     }
+    indexes.sort((a, b) => wheels[a].step - wheels[b].step);
+    let p = 1;
+    let i = 0;
+    while (i < indexes.length && p * wheels[indexes[i]].step <= 49152) {
+      p *= wheels[indexes[i]].step;
+      i += 1;
+    }
+    return indexes.slice(0, i);
+  };
+  const smallWheels = getSmallWheels();
+
+  const updateSieveSegment = function (segmentStart) {
+    let cycleLength = 1;
+    for (let i = 0; i < smallWheels.length; i += 1) {
+      cycleLength *= wheels[smallWheels[i]].step;
+    }
+    for (let i = 0; i < cycleLength; i += 1) {
+      SIEVE_SEGMENT[i] = -0;
+    }
+    for (let j = 0; j < smallWheels.length; j += 1) {
+      const w = wheels[smallWheels[j]];
+      const step = w.step;
+      const log2p = wheelLogs[smallWheels[j]];
+      for (let k = (w.proot + cycleLength - segmentStart % cycleLength) % step; k < cycleLength; k += step) {
+        SIEVE_SEGMENT[k] += log2p;
+      }
+      for (let k = (w.proot2 + cycleLength - segmentStart % cycleLength) % step; k < cycleLength; k += step) {
+        SIEVE_SEGMENT[k] += log2p;
+      }
+    }
+    for (let i = cycleLength; i < segmentSize; i += 1) {
+      SIEVE_SEGMENT[i] = SIEVE_SEGMENT[i - cycleLength];
+    }
+    //for (let j = 0; j < segmentSize; j += 1) {
+    //  SIEVE_SEGMENT[j] = -0;
+    //}
+    const x = smallWheels.length === 0 ? 0 : wheels[smallWheels[smallWheels.length - 1]].step;
     for (let j = 0; j < wheels.length; j += 1) {
       const w = wheels[j];
       const step = w.step;
-      const log2p = wheelLogs[j];
-      let kpplusr = w.proot;
-      while (kpplusr < segmentSize) {
-        SIEVE_SEGMENT[kpplusr] += log2p;
-        kpplusr += step;
+      if (step > x) {
+        const log2p = wheelLogs[j];
+        let kpplusr = w.proot;
+        while (kpplusr < segmentSize) {
+          SIEVE_SEGMENT[kpplusr] += log2p;
+          kpplusr += step;
+        }
+        w.proot = kpplusr - segmentSize;
+        let kpplusr2 = w.proot2;
+        while (kpplusr2 < segmentSize) {
+          SIEVE_SEGMENT[kpplusr2] += log2p;
+          kpplusr2 += step;
+        }
+        w.proot2 = kpplusr2 - segmentSize;
       }
-      w.proot = kpplusr - segmentSize;
-      let kpplusr2 = w.proot2;
-      while (kpplusr2 < segmentSize) {
-        SIEVE_SEGMENT[kpplusr2] += log2p;
-        kpplusr2 += step;
-      }
-      w.proot2 = kpplusr2 - segmentSize;
     }
   };
 
@@ -823,14 +866,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           for (let j = 0; j < wheels.length; j += 1) {
             const w = wheels[j];
             const step = w.step;
-            const x = (w.proot - offset) % step;
+            const x = 0 + (w.proot - offset) % step;
             w.proot = x + (x < 0 ? step : 0);
-            const x2 = (w.proot2 - offset) % step;
+            const x2 = 0 + (w.proot2 - offset) % step;
             w.proot2 = x2 + (x2 < 0 ? step : 0);
           }
 
           for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
-            updateSieveSegment();
+            updateSieveSegment(segmentStart);
             findSmoothEntries(offset + segmentStart, polynomial);
           }
           
@@ -966,3 +1009,4 @@ QuadraticSieveFactorization.testables = {
 };
 
 export default QuadraticSieveFactorization;
+
