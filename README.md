@@ -20,7 +20,7 @@ console.assert(f === 5704689200685129054721n || f === 59649589127497217n, f);
 # Usage notes:
 * Do not call for the **prime numbers**. It may hang for them. Check if the number is prime instead.
 * Do not call for the **[perfect powers](https://en.wikipedia.org/wiki/Perfect_power)**. it may hang for them. Check if the number is a perfect power instead. 
-* Do not call for the **numbers with a small factor**, it is as slow as for semiprimes for them. Try other algorithms to check for small factors instead.
+* Do not call for the **numbers with a small factor**, it is as slow as for semiprimes with similar factor size for them. Try other algorithms to check for small factors instead.
 * The returned value is a some factor, not necessary prime.
 
 See https://www.rieselprime.de/ziki/Factorization for the more detailed usage notes.
