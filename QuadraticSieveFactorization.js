@@ -1,8 +1,9 @@
 /*jshint esversion:6*/
 
 function modInverse(a, m) {
-  a = BigInt(a);
-  m = BigInt(m);
+  if (typeof a !== 'bigint' || typeof m !== 'bigint') {
+    throw new TypeError();
+  }
   if (a < 0n || a >= m || m <= 0n) {
     throw new RangeError();
   }
@@ -27,8 +28,9 @@ function modInverse(a, m) {
 }
 
 function modInverseSmall(a, m) {
-  a = Number(a);
-  m = Number(m);
+  if (typeof a !== 'number' || typeof m !== 'number') {
+    throw new TypeError();
+  }
   const maxSMI = (~(-1 << 30));
   if (a < 0 || a >= m || m <= 0 || m > maxSMI) {
     throw new RangeError();
@@ -88,7 +90,7 @@ function getSquareRootsModuloTwo(n, e = 1) {
   if (e >= 3) {
     if (n % 8 === 1) { // from Cohen H.
       const m = Math.pow(2, e);
-      const candidate = getSquareRootsModuloTwo(n, e - 1)[0];
+      const candidate = Number(getSquareRootsModuloTwo(n, e - 1)[0]);
       const candidate2 = m / 4 - candidate;
       const r = (candidate * candidate) % m !== n ? candidate2 : candidate;
       return [r, m / 2 - r, m / 2 + r, m - r];
@@ -108,9 +110,9 @@ function getSquareRootsModuloTwo(n, e = 1) {
 }
 
 function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
-  n = Number(n);
-  p = Number(p);
-  e = Number(e);
+  if (typeof n !== 'number' || typeof p !== 'number' || typeof e !== 'number') {
+    throw new TypeError();
+  }
   const m = Math.pow(p, e);
   n = n % m;
   if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
@@ -172,7 +174,7 @@ function bitLength(x) {
 
 function sqrt(x) {
   if (x < BigInt((Number.MAX_SAFE_INTEGER + 1) / 2)) {
-    return BigInt(Math.floor(Math.sqrt(Number(x) + 0.5)));
+    return BigInt(Math.floor(Math.sqrt(Number(BigInt(x)) + 0.5)));
   }
   const q = (bitLength(x) / 4n);
   const initialGuess = ((sqrt(x >> (q * 2n)) + 1n) << q);
@@ -246,8 +248,9 @@ CongruenceOfsquareOfXminusYmoduloN.prototype.toString = function () {
 };
 
 function isQuadraticResidueModuloPrime(a, p) {
-  a = BigInt(a);
-  p = Number(p);
+  if (typeof a !== 'bigint' || typeof p !== 'number') {
+    throw new TypeError();
+  }
   if (p === 2) {
     // "Modulo 2, every integer is a quadratic residue." - https://en.wikipedia.org/wiki/Quadratic_residue#Prime_modulus
     return true;
@@ -281,9 +284,9 @@ function product(array) {
 }
 
 function modPowSmall(base, exponent, modulus) {
-  base = Number(base);
-  exponent = Number(exponent);
-  modulus = Number(modulus);
+  if (typeof base !== 'number' || typeof exponent !== 'number' || typeof modulus !== 'number') {
+    throw new TypeError();
+  }
   if (Math.max(Math.pow(modulus, 2), Math.pow(base, 2)) > Number.MAX_SAFE_INTEGER) {
     throw new RangeError();
   }
@@ -493,7 +496,10 @@ function QuadraticPolynomial(A, B, C, q, qInv, N) {
 }
 QuadraticPolynomial.generator = function (M, primes, N) {
   const isPrime = function (n) {
-    if (typeof n !== "number" || n < 2) {
+    if (typeof n !== "number") {
+      throw new TypeError();
+    }
+    if (n < 2) {
       throw new RangeError();
     }
     if (n % 2 === 0) {
@@ -502,7 +508,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
     if (n % 3 === 0) {
       return n === 3;
     }
-    for (let i = 5, max = Math.floor(Math.sqrt(Number(n))); i <= max; i += 6) {
+    for (let i = 5, max = Math.floor(Math.sqrt(n)); i <= max; i += 6) {
       if (n % i === 0) {
         return false;
       }
@@ -618,7 +624,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const sieveSize = sieveSize1;
 
   if (typeof N !== 'bigint') {
-    throw new RangeError();
+    throw new TypeError();
   }
   const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / (3 * 2**17)));
   const SIEVE_SEGMENT1 = [];
