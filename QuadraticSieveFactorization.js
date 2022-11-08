@@ -190,7 +190,7 @@ function sqrt(x) {
 function getSmoothFactorization(a, base) {
   let value = BigInt(a);
   if (value === 0n) {
-    return [];
+    return [0];
   }
   const result = [];
   if (value < 0n) {
@@ -234,17 +234,16 @@ function getSmoothFactorization(a, base) {
 }
 
 // (X**2 - Y) % N === 0, where Y is a smooth number
-function CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization) {
+function CongruenceOfsquareOfXminusYmoduloN(X, Y, N) {
   this.X = X;
   this.Y = Y;
   this.N = N;
-  this.factorization = factorization;
 }
 CongruenceOfsquareOfXminusYmoduloN.prototype.toString = function () {
   const X = this.X;
   const Y = this.Y;
   const N = this.N;
-  return 'X**2 ≡ Y (mod N), Y = F'.replaceAll('X', X).replaceAll('Y', Y).replaceAll('N', N).replaceAll('F', this.factorization.join(' * '));
+  return 'X**2 ≡ Y (mod N)'.replaceAll('X', X).replaceAll('N', N).replaceAll('Y', this.Y.join(' * '));
 };
 
 function isQuadraticResidueModuloPrime(a, p) {
@@ -645,7 +644,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize; beta += 1, pInBeta *= p) {
       const nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
-        console.warn('N has a factor in prime base', N, p);
+        //console.warn('N has a factor in prime base', N, p);
       } else {
         if (p === 2) {
           const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
@@ -674,7 +673,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
       if (sInverse === 0n) {
-        return new CongruenceOfsquareOfXminusYmoduloN(s, 0n, N, null);//?
+        return new CongruenceOfsquareOfXminusYmoduloN(s, [0], N);//?
       } else {
         const X = polynomial.X(x);
         const Y = polynomial.Y(x);
@@ -689,7 +688,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           const fb = getSmoothFactorization(b, primes);
           if (fa != null && fb != null) {
             const factorization = fa.concat(fb).sort((a, b) => a - b);
-            return new CongruenceOfsquareOfXminusYmoduloN(X1, Y1, N, factorization);
+            return new CongruenceOfsquareOfXminusYmoduloN(X1, factorization, N);
           }
         }
       }
@@ -897,7 +896,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
               const factorization = getSmoothFactorization(Y, primes);
               if (factorization != null) {
                 i1 = i;
-                return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N, factorization), done: false};
+                return {value: new CongruenceOfsquareOfXminusYmoduloN(X, factorization, N), done: false};
               } else {
                 console.count('?');
                 /*let p = 1n;
@@ -989,10 +988,10 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length);
         last = now;
       }
-      const solution = c.Y === 0n ? [c] : solutions.next([c.factorization.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p))), c]).value;
+      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p))), c]).value;
       if (solution != null) {
         const X = product(solution.map(c => c.X));
-        const Y = product(solution.map(c => c.Y)); // = sqrt(X**2 % N)
+        const Y = product(solution.map(c => c.Y).flat()); // = sqrt(X**2 % N)
         const x = X;
         const y = BigInt(sqrt(Y));
         console.assert(y * y === BigInt(Y));
