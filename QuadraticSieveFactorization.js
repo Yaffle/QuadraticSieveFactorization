@@ -533,17 +533,29 @@ QuadraticPolynomial.generator = function (M, primes, N) {
     }
     return getCombinations(elements.slice(1), k - 1).map(c => [elements[0]].concat(c)).concat(getCombinations(elements.slice(1), k));
   };
-  const sqrtOfA = BigInt(sqrt(BigInt(sqrt(2n * N)) / BigInt(M)));//TODO: !?
-  const e = log(sqrtOfA) / Math.log(2);
-  const k = Math.max(1, Math.ceil(e / (53 / 4))); // number of small primes
+  const nthRootApprox = function (A, n) {
+    const e = bitLength(A);
+    return Math.round(e <= 1023n ? Math.pow(Number(A), 1 / n) : Math.pow(Number(A >> (e - 1023n)), 1 / n) * Math.pow(2, Number(e - 1023n) / n));
+  };
+  const S = BigInt(sqrt(2n * N)) / BigInt(M);
+  const e = log(S) / Math.log(2);
+  const k = Math.max(2, Math.ceil(e / (53 / 4) / 2) * 2); // number of small primes
   //console.debug(k);
-  const p = Math.round(e <= 1023n ? Math.pow(Number(sqrtOfA), 1 / k) : Math.pow(Number(sqrtOfA >> (e - 1023n)), 1 / k) * Math.pow(2, Number(e - 1023n) / k));
+  const p = nthRootApprox(S, k);
   //const B = BigInt(primes[primes.length - 1]);
   //if (p <= B) {
   //  p = B + 2n;
   //}
   //p += 3 - p % 4;
   let s = 0;
+  const nextPrime = function () {
+    let p3 = 0;
+    do {
+      p3 = p - p % 2 + 1 + (s % 2 === 0 ? s : (-1 - s));
+      s += 1;
+    } while (p3 < 2 || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
+    return p3;
+  };
   let combinations = [];
   const polynomials = [];
   const elements = [];
@@ -552,14 +564,11 @@ QuadraticPolynomial.generator = function (M, primes, N) {
     next: function generator() {
       while (polynomials.length === 0) {
         while (combinations.length === 0) {
-          let p3 = 0;
-          do {
-            p3 = p - p % 2 + 1 + (s % 2 === 0 ? s : (-1 - s));
-            s += 1;
-          } while (p3 < 2 || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
-          combinations = getCombinations(elements, k - 1).map(c => [p3].concat(c));
+          const p3 = nextPrime();
+          console.assert(k % 2 === 0);
+          combinations = getCombinations(elements, k / 2 - 1).map(c => [p3].concat(c));
           elements.push(p3);
-          //console.log(elements.length, combinations.length, p**k / Number(sqrtOfA));
+          //console.log(elements.length, combinations.length, p**k / Number(S));
         }
         const qPrimes = combinations.pop();
         const q = product(qPrimes.map(p => BigInt(p)));
