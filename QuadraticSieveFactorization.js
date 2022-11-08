@@ -478,14 +478,17 @@ function exp2(x) {
 
 const useMultiplePolynomials = true;
 
-// A*x**2 + 2*B*x + C, A = q**2, qInv = q**-1 mod N
-function QuadraticPolynomial(A, B, C, q, qInv, N) {
+// (A * x + B)**2 - N = A * (A * x**2 + 2 * B * x + C), A * C = B**2 - N
+function QuadraticPolynomial(A, B, N, AFactors) {
+  const AC = (B * B - N);
+  if (AC % A !== 0n) {
+    throw new TypeError();
+  }
+  const C = AC / A;
   this.A = A;
   this.B = B;
   this.C = C;
-  this.q = q;
-  this.qInv = qInv;
-  this.N = N;
+  this.AFactors = AFactors;
   const logA = log(A);
   const u = -Math.exp(log(B) - logA);
   const v = Math.exp(log(N) / 2 - logA);
@@ -573,12 +576,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
         Bs.sort((a, b) => Number(a - b));
         for (let i = 0; i < Bs.length / 2; i += 1) {
           const B = Bs[i];
-          const AC = (B * B - N);
-          if (AC % A !== 0n) {
-            throw new Error();
-          }
-          const C = AC / A;
-          polynomials.push(new QuadraticPolynomial(A, B, C, q, qInv, N));
+          polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes.concat(qPrimes)));
         }
       }
       QuadraticSieveFactorization.polynomialsCounter += 1;
@@ -587,10 +585,21 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   };
 };
 QuadraticPolynomial.prototype.X = function (x) {
-  return (this.A * BigInt(x) + this.B) * this.qInv;
+  return (this.A * BigInt(x) + this.B);
 };
-QuadraticPolynomial.prototype.Y = function (x) {
-  return this.A * (x * x <= Number.MAX_SAFE_INTEGER ? BigInt(x * x) : (a => a * a)(BigInt(x))) + this.B * BigInt(2 * x) + this.C;
+QuadraticPolynomial.prototype.Y = function (x, s, primes) {
+  const Y = this.A * (x * x <= Number.MAX_SAFE_INTEGER ? BigInt(x * x) : (a => a * a)(BigInt(x))) + this.B * BigInt(2 * x) + this.C;
+  if (Y % s !== 0n) {
+    return null;
+  }
+  const YFactors = getSmoothFactorization(Y / s, primes);
+  if (YFactors == null) {
+    return null;
+  }
+  if (YFactors.length === 1 && YFactors[0] === 0) {
+    return YFactors;
+  }
+  return this.AFactors.concat(YFactors);
 };
 QuadraticPolynomial.prototype.log2AbsY = function (x) {
   //const v1 = Math.log2(Math.abs(Number(this.Y(x))));
@@ -676,20 +685,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         return new CongruenceOfsquareOfXminusYmoduloN(s, [0], N);//?
       } else {
         const X = polynomial.X(x);
-        const Y = polynomial.Y(x);
+        const Y = polynomial.Y(x, s, primes);
         const lpX = lp.polynomial.X(lp.x);
-        const lpY = lp.polynomial.Y(lp.x);
+        const lpY = lp.polynomial.Y(lp.x, s, primes);
         const X1 = (sInverse * lpX * X) % N;
-        if (Y % s === 0n && lpY % s === 0n) {
-          const a = lpY / s;
-          const b = Y / s;
-          const Y1 = a * b;
-          const fa = getSmoothFactorization(a, primes);
-          const fb = getSmoothFactorization(b, primes);
-          if (fa != null && fb != null) {
-            const factorization = fa.concat(fb).sort((a, b) => a - b);
-            return new CongruenceOfsquareOfXminusYmoduloN(X1, factorization, N);
-          }
+        if (Y != null && lpY != null) {
+          const Y1 = Y.concat(lpY);
+          return new CongruenceOfsquareOfXminusYmoduloN(X1, Y1, N);
         }
       }
     }
@@ -701,7 +703,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (!useMultiplePolynomials) {
     // - Number(baseOffset % BigInt(pInBeta))
     const baseOffset = BigInt(sqrt(N)) + 1n;
-    polynomial = new QuadraticPolynomial(1n, baseOffset, baseOffset * baseOffset - N, 1n, 1n, N);
+    polynomial = new QuadraticPolynomial(1n, baseOffset, N, []);
     for (let i = 0; i < wheels.length; i += 1) {
       const wheel = wheels[i];
       const pInBeta = wheel.step;
@@ -892,11 +894,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             const threshold = polynomial.log2AbsY(x);
             if (threshold - value < 1) {
               const X = polynomial.X(x);
-              const Y = polynomial.Y(x);
-              const factorization = getSmoothFactorization(Y, primes);
-              if (factorization != null) {
+              const Y = polynomial.Y(x, 1n, primes);
+              if (Y != null) {
                 i1 = i;
-                return {value: new CongruenceOfsquareOfXminusYmoduloN(X, factorization, N), done: false};
+                return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N), done: false};
               } else {
                 console.count('?');
                 /*let p = 1n;
@@ -988,7 +989,24 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length);
         last = now;
       }
-      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p))), c]).value;
+      const t = () => {throw new TypeError()};
+      const removeSquares = (array) => {
+        const copy = array.slice(0).sort((a, b) => BigInt(a) < BigInt(b) ? -1 : +1);
+        const result = [];
+        let i = 0;
+        while (i < copy.length) {
+          let count = 1;
+          while (i + count < copy.length && copy[i] === copy[i + count]) {
+            count += 1;
+          }
+          if (count % 2 === 1) {
+            result.push(copy[i]);
+          }
+          i += count;
+        }
+        return result;
+      };
+      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([removeSquares(c.Y).map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
       if (solution != null) {
         const X = product(solution.map(c => c.X));
         const Y = product(solution.map(c => c.Y).flat()); // = sqrt(X**2 % N)
