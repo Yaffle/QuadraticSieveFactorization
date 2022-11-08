@@ -562,30 +562,33 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   QuadraticSieveFactorization.polynomialsCounter = 0;
   return {
     next: function generator() {
+      const squares = primes.length < 2000;//TODO: !?
       while (polynomials.length === 0) {
+        // There must be at least two different primes from previous selections. - from https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
         while (combinations.length === 0) {
           const p3 = nextPrime();
+          const p4 = squares ? p3 : nextPrime();
           console.assert(k % 2 === 0);
-          combinations = getCombinations(elements, k / 2 - 1).map(c => [p3].concat(c));
-          elements.push(p3);
+          combinations = getCombinations(elements, k / 2 - 1).map(c => [[p3, p4]].concat(c));
+          elements.push([p3, p4]);
           //console.log(elements.length, combinations.length, p**k / Number(S));
         }
-        const qPrimes = combinations.pop();
-        const q = product(qPrimes.map(p => BigInt(p)));
+        const qPrimes = combinations.pop().map(x => squares ? [x[0]] : x).flat();
+        const q = product(qPrimes);
         const qInv = modInverse(q % N, N);
         if (qInv === 0n) {
           //TODO: what to do here - ?
           return this.next();
         }
-        const A = q * q;
-        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 2);
+        const A = squares ? q * q : q;
+        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, squares ? 2 : 1);
         for (let i = 0; i < Bs.length; i += 1) {
           Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
         }
         Bs.sort((a, b) => Number(a - b));
         for (let i = 0; i < Bs.length / 2; i += 1) {
           const B = Bs[i];
-          polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes.concat(qPrimes)));
+          polynomials.push(new QuadraticPolynomial(A, B, N, squares ? qPrimes.concat(qPrimes) : qPrimes));
         }
       }
       QuadraticSieveFactorization.polynomialsCounter += 1;
