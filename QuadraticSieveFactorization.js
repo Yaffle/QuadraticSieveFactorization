@@ -772,7 +772,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     indexes.sort((a, b) => wheels[a].step - wheels[b].step);
     let p = 1;
     let i = 0;
-    while (i < indexes.length && p * wheels[indexes[i]].step <= 49152) {
+    while (i < indexes.length && p * wheels[indexes[i]].step <= segmentSize) {
       p *= wheels[indexes[i]].step;
       i += 1;
     }
@@ -782,13 +782,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const updateSieveSegment = function (segmentStart) {
     let cycleLength = 1;
-    for (let i = 0; i < smallWheels.length; i += 1) {
-      cycleLength *= wheels[smallWheels[i]].step;
-    }
-    for (let i = 0; i < cycleLength; i += 1) {
-      SIEVE_SEGMENT[i] = -0;
-    }
+    SIEVE_SEGMENT[0] = -0;
     for (let j = 0; j < smallWheels.length; j += 1) {
+      const newCycleLength = cycleLength * wheels[smallWheels[j]].step;
+      for (let i = cycleLength; i < newCycleLength; i += 1) {
+        SIEVE_SEGMENT[i] = SIEVE_SEGMENT[i - cycleLength];
+      }
+      cycleLength = newCycleLength;
       const w = wheels[smallWheels[j]];
       const step = w.step;
       const log2p = wheelLogs[smallWheels[j]];
@@ -850,6 +850,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
+  QuadraticSieveFactorization.lpCounter = 0;
   let i1 = -1;
   let k = 0;
   const iterator = {
@@ -917,6 +918,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 const c = lpStrategy(p, polynomial, x);
                 if (c != null) {
                   i1 = i;
+                  QuadraticSieveFactorization.lpCounter += 1;
                   return {value: c, done: false};
                 }
               }
@@ -986,7 +988,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
       c1 += 1;
       const now = Date.now();
       if (now - last > 5000) {
-        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length);
+        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length, 'LP: ', QuadraticSieveFactorization.lpCounter);
         last = now;
       }
       const t = () => {throw new TypeError()};
