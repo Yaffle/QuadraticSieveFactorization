@@ -10,6 +10,7 @@
   import factorize from './QuadraticSieveFactorization.js';
   document.querySelector('form').onsubmit = function (event) {
     event.preventDefault();
+    const start = Date.now();
     const integer = eval(document.querySelector('input').value.replace(/(\d+)/g, '$1n'));
     const primeFactors = [];
     if (integer < 0n) {
@@ -45,13 +46,20 @@
       }
       return result;
     };
+    const end = Date.now();
     document.querySelector('output').innerHTML = integer + ' = ' + group(primeFactors).map(g => g.multiplicity === 1 ? g.prime : g.prime + '**' + g.multiplicity).join(' * ');
+    document.querySelector('time').innerHTML = (end - start) + 'ms';
   };
 </script>
 </head>
 <body>
-<div><form><input type="text" value="2**128+1" /><button>Go</button></form></div>
+<datalist id="samples">
+  <option value="2**128 + 1" label="7th Fermat Number">
+  <option value="(10**71 - 1) / 9">
+</datalist>
+<div><form><input type="text" value="2**128 + 1" list="samples" /><button>Go</button></form></div>
 <output>&nbsp;</output>
+<output id="time">&nbsp;</output>
 <div>
 <a href="https://github.com/Yaffle/QuadraticSieveFactorization">source code</a>
 </div>
