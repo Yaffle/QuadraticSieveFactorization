@@ -48,7 +48,7 @@
     };
     const end = Date.now();
     document.querySelector('output').innerHTML = integer + ' = ' + group(primeFactors).map(g => g.multiplicity === 1 ? g.prime : g.prime + '**' + g.multiplicity).join(' * ');
-    document.querySelector('time').innerHTML = (end - start) + 'ms';
+    document.querySelector('#time').innerHTML = (end - start) + 'ms';
   };
 </script>
 </head>
