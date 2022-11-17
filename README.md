@@ -3,7 +3,7 @@ Integer factorization using [Quadratic Sieve](https://en.wikipedia.org/wiki/Quad
 
 There is series of videos explaining the algorithm at https://www.youtube.com/playlist?list=PL0OUqr2O9PxLd35SgBiWIxuLgm7mYksfp .
 
-Useful info can also be found at https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve .
+Useful info can also be found at https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve and at https://www.enseignement.polytechnique.fr/informatique/INF558/TD/td_5/S0025-5718-1987-0866119-8.pdf .
 
 See other links in the code.
 

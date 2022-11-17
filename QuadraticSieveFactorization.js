@@ -545,7 +545,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   const S = BigInt(sqrt(2n * N)) / BigInt(M);
   const e = log(S) / Math.log(2);
   const squares = primes.length < 2000;//TODO: !?
-  const k = Math.max(2, Math.ceil(e / (squares ? 13.75 : 14.5) / 2) * 2); // number of small primes
+  const k = Math.max(2, Math.ceil(e / (squares ? 13.50 : 14.5) / 2) * 2); // number of small primes
   //console.debug(k);
   const p = nthRootApprox(S, k);
   //const B = BigInt(primes[primes.length - 1]);
@@ -771,8 +771,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       if (invA === 0) {
         //console.log('unsupported A');
-        w.proot = 1073741823;
-        w.proot2 = 1073741823;
+        w.proot = sieveSize;
+        w.proot2 = sieveSize;
       } else {
         //const b = Number(polynomial.B % BigInt(pInBeta));
         const b = FastMod(BB, pInBeta, sInv);
@@ -795,35 +795,77 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
-  const getSmallWheels = function () {
-    const n = Math.min(64, wheels.length);
-    const indexes = new Array(n);
-    for (let i = 0; i < n; i += 1) {
-      indexes[i] = i;
+  const gcd = function (a, b) {
+    while (b !== 0) {
+      const r = a % b;
+      a = b;
+      b = r;
     }
-    indexes.sort((a, b) => wheels[a].step - wheels[b].step);
+    return a;
+  };
+  const lcm = function (a, b) {
+    return Math.floor(a / gcd(a, b)) * b;
+  };
+  const getSmallWheels = function () {
     let p = 1;
     let i = 0;
-    while (i < indexes.length && p * wheels[indexes[i]].step <= segmentSize) {
-      p *= wheels[indexes[i]].step;
+    while (i < wheels.length && lcm(p, wheels[i].step) <= segmentSize) {
+      p = lcm(p, wheels[i].step);
       i += 1;
     }
-    return indexes.slice(0, i);
+    return i;
   };
   const smallWheels = getSmallWheels();
+
+
+
+  const singleBlockSieve = function (limit, subsegmentEnd, s) {
+    for (let j = smallWheels; j < limit; j += 1) {
+      const w = wheels[j];
+      const step = w.step;
+      const log2p = wheelLogs[j];
+      let kpplusr = w.proot;
+      let kpplusr2 = w.proot2;
+      while (kpplusr < subsegmentEnd) {
+        SIEVE_SEGMENT[kpplusr] += log2p;
+        kpplusr += step;
+      }
+      while (kpplusr2 < subsegmentEnd) {
+        SIEVE_SEGMENT[kpplusr2] += log2p;
+        kpplusr2 += step;
+      }
+      w.proot = kpplusr - s;
+      w.proot2 = kpplusr2 - s;
+    }
+  };
+
+  const copyWithin = function (array, target, start, end) {
+    const end2 = end - end % 2;
+    let j = start;
+    while (j < end2) {
+      array[target + j] = array[j];
+      j += 1;
+      array[target + j] = array[j];
+      j += 1;
+    }
+    if (j < end) {
+      array[target + j] = array[j];
+      j += 1;
+    }
+  };
 
   const updateSieveSegment = function (segmentStart) {
     let cycleLength = 1;
     SIEVE_SEGMENT[0] = -0;
-    for (let j = 0; j < smallWheels.length; j += 1) {
-      const newCycleLength = cycleLength * wheels[smallWheels[j]].step;
-      for (let i = cycleLength; i < newCycleLength; i += 1) {
-        SIEVE_SEGMENT[i] = SIEVE_SEGMENT[i - cycleLength];
+    for (let j = 0; j < smallWheels; j += 1) {
+      const newCycleLength = lcm(cycleLength, wheels[j].step);
+      for (let i = cycleLength; i < newCycleLength; i += cycleLength) {
+        copyWithin(SIEVE_SEGMENT, i, 0, Math.min(newCycleLength - i, cycleLength));
       }
       cycleLength = newCycleLength;
-      const w = wheels[smallWheels[j]];
+      const w = wheels[j];
       const step = w.step;
-      const log2p = wheelLogs[smallWheels[j]];
+      const log2p = wheelLogs[j];
       for (let k = (w.proot + cycleLength - segmentStart % cycleLength) % step; k < cycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
@@ -831,32 +873,21 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         SIEVE_SEGMENT[k] += log2p;
       }
     }
-    for (let i = cycleLength; i < segmentSize; i += 1) {
-      SIEVE_SEGMENT[i] = SIEVE_SEGMENT[i - cycleLength];
+    for (let i = cycleLength; i < segmentSize; i += cycleLength) {
+      copyWithin(SIEVE_SEGMENT, i, 0, Math.min(segmentSize - i, cycleLength));
     }
     //for (let j = 0; j < segmentSize; j += 1) {
     //  SIEVE_SEGMENT[j] = -0;
     //}
-    const x = smallWheels.length === 0 ? 0 : wheels[smallWheels[smallWheels.length - 1]].step;
-    for (let j = 0; j < wheels.length; j += 1) {
-      const w = wheels[j];
-      const step = w.step;
-      if (step > x) {
-        const log2p = wheelLogs[j];
-        let kpplusr = w.proot;
-        let kpplusr2 = w.proot2;
-        while (kpplusr < segmentSize) {
-          SIEVE_SEGMENT[kpplusr] += log2p;
-          kpplusr += step;
-        }
-        while (kpplusr2 < segmentSize) {
-          SIEVE_SEGMENT[kpplusr2] += log2p;
-          kpplusr2 += step;
-        }
-        w.proot = kpplusr - segmentSize;
-        w.proot2 = kpplusr2 - segmentSize;
-      }
+    // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
+    const V = 64;
+    const S = 2**12 - V * 8;
+    let subsegmentEnd = 0;
+    while (subsegmentEnd + S <= segmentSize) {
+      subsegmentEnd += S;
+      singleBlockSieve(V, subsegmentEnd, 0);
     }
+    singleBlockSieve(wheels.length, segmentSize, segmentSize);
   };
 
   const smoothEntries = [];
