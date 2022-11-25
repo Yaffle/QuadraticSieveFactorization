@@ -310,8 +310,10 @@ function primes(MAX) {
   for (let i = 3; i <= MAX; i += 2) {
     if (sieve[i]) {
       result.push(i);
-      for (let j = i * i; j <= MAX; j += 2 * i) {
-        sieve[j] = false;
+      if (i <= Math.floor(MAX / i)) {
+        for (let j = i * i; j <= MAX; j += 2 * i) {
+          sieve[j] = false;
+        }
       }
     }
   }
@@ -350,8 +352,13 @@ BitSet.prototype.nextSetBit = function (index) {
     x = data[q];
     r = 0;
   }
-  // https://stackoverflow.com/questions/61442006/whats-the-most-efficient-way-of-getting-position-of-least-significant-bit-of-a
-  r += 31 - Math.clz32(x & -x);
+  if (x === (-1 << (BitSetWordSize - 1))) {
+    // -x overflows
+    r += BitSetWordSize - 1;
+  } else {
+    // https://stackoverflow.com/questions/61442006/whats-the-most-efficient-way-of-getting-position-of-least-significant-bit-of-a
+    r += 31 - Math.clz32(x & -x);
+  }
   return q * BitSetWordSize + r;
 };
 BitSet.prototype.toggle = function (index) {
@@ -1097,4 +1104,3 @@ QuadraticSieveFactorization.testables = {
 };
 
 export default QuadraticSieveFactorization;
-
