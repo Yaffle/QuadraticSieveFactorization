@@ -559,7 +559,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
           elements.push([p3, p4]);
           //console.log(elements.length, combinations.length, p**k / Number(S));
         }
-        const qPrimes = combinations.pop().flat();
+        const qPrimes = combinations.pop().reduce((array, pair) => array.concat(pair), []);
         const q = product(qPrimes);
         const qInv = modInverse(q % N, N);
         if (qInv === 0n) {
@@ -1034,7 +1034,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
       if (true) {
         congruencesFound += 1;
         const now = Date.now();
-        if (now - last > 5000 || solution != null || congruencesFound === 1) {
+        if (now - last > 5000 || solution != null) {
           console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
                         'expected time: ', (now - start) / congruencesFound * primeBase.length,
                         'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
@@ -1044,7 +1044,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
       }
       if (solution != null) {
         const X = product(solution.map(c => c.X));
-        const Y = product(solution.map(c => c.Y).flat()); // = sqrt(X**2 % N)
+        const Y = product(solution.map(c => product(c.Y))); // = sqrt(X**2 % N)
         const x = X;
         const y = BigInt(sqrt(Y));
         console.assert(y * y === BigInt(Y));
