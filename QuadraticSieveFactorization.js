@@ -508,29 +508,6 @@ function QuadraticPolynomial(A, B, N, AFactors) {
   this.log2a = logA / Math.LN2;
 }
 QuadraticPolynomial.generator = function (M, primes, N) {
-  const isPrime = function (n) {
-    if (typeof n !== "number") {
-      throw new TypeError();
-    }
-    if (n < 2) {
-      throw new RangeError();
-    }
-    if (n % 2 === 0) {
-      return n === 2;
-    }
-    if (n % 3 === 0) {
-      return n === 3;
-    }
-    for (let i = 5, max = Math.floor(Math.sqrt(n)); i <= max; i += 6) {
-      if (n % i === 0) {
-        return false;
-      }
-      if (n % (i + 2) === 0) {
-        return false;
-      }
-    }
-    return true;
-  };
   // see https://www.cs.virginia.edu/crab/QFS_Simple.pdf for multiple primes optimization
   const getCombinations = function (elements, k) {
     if (elements.length === 0) {
@@ -563,7 +540,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
     do {
       p3 = p - p % 2 + 1 + (s % 2 === 0 ? s : (-1 - s));
       s += 1;
-    } while (p3 < 2 || p3 > primes[primes.length - 1] || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
+    } while (indexOf(primes, p3) === -1);
     return p3;
   };
   let combinations = [];
