@@ -1,4 +1,4 @@
-/*jshint esversion:6*/
+/*jshint esversion:11*/
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
@@ -69,12 +69,12 @@ function squareRootsModuloOddPrimesProduct(n, primes, e = 1) {
   result.push(0n);
   let P = 1n;
   for (let i = 0; i < primes.length; i += 1) {
-    if (Math.pow(primes[i], e) > Number.MAX_SAFE_INTEGER) {
+    const p = BigInt(Math.pow(primes[i], e));
+    if (Number(p) > Number.MAX_SAFE_INTEGER) {
       throw new RangeError();
     }
-    const x2 = BigInt(squareRootModuloOddPrime(Number(n % BigInt(Math.pow(primes[i], e))), primes[i], e));
+    const x2 = BigInt(squareRootModuloOddPrime(Number(n % p), primes[i], e));
     const result2 = [];
-    const p = BigInt(Math.pow(primes[i], e));
     for (let j = 0; j < result.length; j += 1) {
       const x1 = result[j];
       result2.push(ChineseRemainderTheorem(x1, x2, P, p));
@@ -240,10 +240,9 @@ function CongruenceOfsquareOfXminusYmoduloN(X, Y, N) {
   this.N = N;
 }
 CongruenceOfsquareOfXminusYmoduloN.prototype.toString = function () {
-  const X = this.X;
-  const Y = this.Y;
-  const N = this.N;
-  return 'X**2 ≡ Y (mod N)'.replaceAll('X', X).replaceAll('N', N).replaceAll('Y', this.Y.join(' * '));
+  return 'X**2 ≡ Y (mod N)'.replaceAll('X', this.X)
+                           .replaceAll('N', this.N)
+                           .replaceAll('Y', this.Y.join(' * '));
 };
 
 function isQuadraticResidueModuloPrime(a, p) {
@@ -551,22 +550,20 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   };
   const S = BigInt(sqrt(2n * N)) / BigInt(M);
   const e = log(S) / Math.log(2);
-  const squares = primes.length < 2000;//TODO: !?
-  const k = Math.max(2, Math.ceil(e / (squares ? 13.50 : 14.5) / 2) * 2); // number of small primes
+  if (primes.length < 16) {
+    throw new TypeError();//TODO:
+  }
+  const max1 = Math.log2(primes[primes.length - 1]);
+  const k = Math.max(2, Math.ceil(e / Math.min(14.5, max1) / 2) * 2); // number of small primes
   //console.debug(k);
   const p = nthRootApprox(S, k);
-  //const B = BigInt(primes[primes.length - 1]);
-  //if (p <= B) {
-  //  p = B + 2n;
-  //}
-  //p += 3 - p % 4;
   let s = 0;
   const nextPrime = function () {
     let p3 = 0;
     do {
       p3 = p - p % 2 + 1 + (s % 2 === 0 ? s : (-1 - s));
       s += 1;
-    } while (p3 < 2 || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
+    } while (p3 < 2 || p3 > primes[primes.length - 1] || !isPrime(p3) || !isQuadraticResidueModuloPrime(N, p3));
     return p3;
   };
   let combinations = [];
@@ -579,28 +576,28 @@ QuadraticPolynomial.generator = function (M, primes, N) {
         // There must be at least two different primes from previous selections. - from https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
         while (combinations.length === 0) {
           const p3 = nextPrime();
-          const p4 = squares ? p3 : nextPrime();
+          const p4 = nextPrime();
           console.assert(k % 2 === 0);
           combinations = getCombinations(elements, k / 2 - 1).map(c => [[p3, p4]].concat(c));
           elements.push([p3, p4]);
           //console.log(elements.length, combinations.length, p**k / Number(S));
         }
-        const qPrimes = combinations.pop().map(x => squares ? [x[0]] : x).flat();
+        const qPrimes = combinations.pop().flat();
         const q = product(qPrimes);
         const qInv = modInverse(q % N, N);
         if (qInv === 0n) {
           //TODO: what to do here - ?
           return this.next();
         }
-        const A = squares ? q * q : q;
-        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, squares ? 2 : 1);
+        const A = q;
+        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 1);
         for (let i = 0; i < Bs.length; i += 1) {
           Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
         }
         Bs.sort((a, b) => Number(a - b));
         for (let i = 0; i < Bs.length / 2; i += 1) {
           const B = Bs[i];
-          polynomials.push(new QuadraticPolynomial(A, B, N, squares ? qPrimes.concat(qPrimes) : qPrimes));
+          polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes));
         }
       }
       QuadraticSieveFactorization.polynomialsCounter += 1;
@@ -1040,7 +1037,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
-    const B = Math.min(Math.floor(Math.sqrt(L(kN) / 8)), (1 << 25) - 1);
+    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / 8)), (1 << 25) - 1), 320);
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
@@ -1061,24 +1058,8 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length, 'LP: ', QuadraticSieveFactorization.lpCounter);
         last = now;
       }
-      const t = () => {throw new TypeError()};
-      const removeSquares = (array) => {
-        const copy = array.slice(0).sort((a, b) => typeof a === "number" && typeof b === "number" ? (a - b) : BigInt(a) < BigInt(b) ? -1 : +1);
-        const result = [];
-        let i = 0;
-        while (i < copy.length) {
-          let count = 1;
-          while (i + count < copy.length && copy[i] === copy[i + count]) {
-            count += 1;
-          }
-          if (count % 2 === 1) {
-            result.push(copy[i]);
-          }
-          i += count;
-        }
-        return result;
-      };
-      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([removeSquares(c.Y).map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
+      const t = () => {throw new TypeError(N);};
+      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
       if (solution != null) {
         const X = product(solution.map(c => c.X));
         const Y = product(solution.map(c => c.Y).flat()); // = sqrt(X**2 % N)
