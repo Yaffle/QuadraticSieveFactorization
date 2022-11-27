@@ -1025,18 +1025,23 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     const solutions = solve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
     solutions.next();
     let c = null;
-    let c1 = 0;
     const start = Date.now();
+    let congruencesFound = 0;
     let last = start;
     while ((c = congruences.next().value) != undefined) {
-      c1 += 1;
-      const now = Date.now();
-      if (now - last > 5000) {
-        console.debug('congruences found: ', c1, '/', primeBase.length, 'expected time: ', (now - start) / c1 * primeBase.length, 'LP: ', QuadraticSieveFactorization.lpCounter);
-        last = now;
-      }
       const t = () => {throw new TypeError(N);};
       const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
+      if (true) {
+        congruencesFound += 1;
+        const now = Date.now();
+        if (now - last > 5000 || solution != null || congruencesFound === 1) {
+          console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
+                        'expected time: ', (now - start) / congruencesFound * primeBase.length,
+                        'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
+                        'polynomials used: ', QuadraticSieveFactorization.polynomialsCounter);
+          last = now;
+        }
+      }
       if (solution != null) {
         const X = product(solution.map(c => c.X));
         const Y = product(solution.map(c => c.Y).flat()); // = sqrt(X**2 % N)
