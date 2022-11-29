@@ -729,6 +729,22 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     return m - (m >= b ? b : 0);
   };
 
+  function checkWheels(offset) {
+    for (let k = 0; k < wheels.length; k += 1) {
+      for (let v = 0; v <= 1; v += 1) {
+        const root = (v === 0 ? wheels[k].proot : wheels[k].proot2);
+        if (root !== sieveSize) {
+          const x = BigInt(root + offset);
+          const X = (polynomial.A * x + polynomial.B);
+          const Y = X * X - N;
+          if (Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(wheels[k].step) !== 0n) {
+            throw new Error();
+          }
+        }
+      }
+    }
+  }
+
   const updateWheels = function (polynomial, offset) {
     //recalculate roots based on the formulat:
     //proot = ((-B + root) * modInv(A, pInBeta)) % pInBeta;
@@ -741,39 +757,27 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const pInBeta = w.step;
       const root = wheelRoots[i];
       const sInv = wheelStepInvs[i];
-      let invA = 0;
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(pInBeta));
         const a = FastMod(AA, pInBeta, sInv);
-        invA = modInverseSmall(a | 0, pInBeta);
-        invCache[i] = invA;
-      } else {
-        invA = invCache[i];
+        invCache[i] = modInverseSmall(a, pInBeta);
       }
+      const invA = invCache[i];
+      //const b = Number(polynomial.B % BigInt(pInBeta));
+      const b = FastMod(BB, pInBeta, sInv);
       if (invA === 0) {
-        //console.log('unsupported A');
+        // single root:
+        // X = (2B)^-1*(-C) (mod p)
+        // skip as the performance is not better
         w.proot = sieveSize;
         w.proot2 = sieveSize;
       } else {
-        //const b = Number(polynomial.B % BigInt(pInBeta));
-        const b = FastMod(BB, pInBeta, sInv);
         w.proot = fmod((-b + root) * invA - offset, pInBeta, sInv);
         w.proot2 = fmod((-b - root) * invA - offset, pInBeta, sInv);
       }
     }
     invCacheKey = polynomial.A;
-    if (false) {
-      for (let k = 0; k < wheels.length; k += 1) {
-        for (let v = 0; v <= 1; v += 1) {
-          const x = BigInt(v === 0 ? wheels[k].proot : wheels[k].proot2);
-          const X = (polynomial.A * x + polynomial.B);
-          const Y = X * X - N;
-          if (Y % BigInt(wheels[k].step) !== 0n) {
-            throw new Error();
-          }
-        }
-      }
-    }
+    //checkWheels(offset);
   };
 
   const gcd = function (a, b) {
@@ -1067,3 +1071,5 @@ QuadraticSieveFactorization.testables = {
 };
 
 export default QuadraticSieveFactorization;
+
+// see also https://github.com/danaj/Math-Prime-Util-GMP
