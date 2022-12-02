@@ -873,22 +873,29 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const smoothEntries = [];
   const smoothEntries2 = [];
   const findSmoothEntries = function (offset, polynomial) {
-    let j = 0;
+    let i = 0;
     let thresholdApproximation = 0.5;
-    while (j < segmentSize) {
-      const k = j;
+    while (i < segmentSize) {
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      thresholdApproximation = polynomial.log2AbsY(j + offset) - twoB;
-      j = thresholdApproximationInterval(polynomial, j + offset, thresholdApproximation + twoB, sieveSize) - offset;
-      j = j > segmentSize ? segmentSize : j;
+      thresholdApproximation = polynomial.log2AbsY(i + offset) - twoB;
+      const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation + twoB, sieveSize) - offset);
 
-      for (let i = k; i < j; i += 1) {
+      while (i < j) {
+        if (i < j - 1) {
+          const tmp = SIEVE_SEGMENT[j - 1];
+          SIEVE_SEGMENT[j - 1] = 1/0;
+          while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
+            i += 1;
+          }
+          SIEVE_SEGMENT[j - 1] = tmp;
+        }
         if (thresholdApproximation < SIEVE_SEGMENT[i]) {
           smoothEntries.push(i + offset);
           smoothEntries2.push(SIEVE_SEGMENT[i]);
         }
+        i += 1;
       }
     }
   };
