@@ -203,7 +203,7 @@ function getSmoothFactorization(a, base) {
   let isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
   while (i < base.length && isBig) {
     const p = base[i];
-    while (FastMod(fastValue, p, 1 / p) === 0) {
+    while (FastMod(fastValue, p) === 0) {
       value /= BigInt(p);
       fastValue = FastModBigInt(value);
       isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
@@ -455,28 +455,26 @@ function solve(matrixSize) {
 function FastModBigInt(a) {
   const array = [];
   while (a !== 0n) {
-    const x = Number(BigInt.asUintN(52, a));
+    const x = Number(BigInt.asUintN(51, a));
     array.push(x);
-    a >>= 52n;
+    a >>= 51n;
   }
   return array;
 }
-function FastMod(array, integer, inv) {
+function FastMod(array, integer) {
   const n = array.length - 1;
   let result = array[n];
-  const v = integer + 0.5 - 0.5;
+  const v = integer;
+  const inv = (1 + 2**-52) / v;
   result -= Math.floor(result * inv) * v;
   if (n > 0) {
-    const x = 2**52 - Math.floor(2**52 * inv) * v;
+    const x = 2**51 - Math.floor(2**51 * inv) * v;
     let i = n;
     do {
       i -= 1;
       result = result * x + array[i];
       result -= Math.floor(result * inv) * v;
     } while (i !== 0);
-  }
-  if (result >= v) {
-    result -= v;
   }
   return result;
 }
@@ -677,7 +675,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     wheels.push({step: w.step, proot: 0, proot2: 0});
     wheelLogs.push(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1));
     wheelRoots.push(w.root);
-    wheelStepInvs.push(1 / w.step);
+    wheelStepInvs.push((1 + 2**-52) / w.step);
   }
 
   const lpStrategy = function (p, polynomial, x) {
@@ -724,11 +722,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let invCacheKey = 0n;
   const invCache = packedArray(wheels.length);
 
-  const fmod = function (a, b, bInv) {
-    const m = (a - Math.floor(a * bInv) * b) | 0;
-    return m - (m >= b ? b : 0);
-  };
-
   function checkWheels(offset) {
     for (let k = 0; k < wheels.length; k += 1) {
       for (let v = 0; v <= 1; v += 1) {
@@ -747,33 +740,35 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const updateWheels = function (polynomial, offset) {
     //recalculate roots based on the formulat:
-    //proot = ((-B + root) * modInv(A, pInBeta)) % pInBeta;
+    //proot = ((-B + root) * modInv(A, p)) % p;
     //+some optimizations to minimize bigint usage and modInverseSmall calls
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
     const useCache = polynomial.A === invCacheKey;
     for (let i = 0; i < wheels.length; i += 1) {
       const w = wheels[i];
-      const pInBeta = w.step;
+      const p = w.step;
       const root = wheelRoots[i];
       const sInv = wheelStepInvs[i];
       if (!useCache) {
-        //const a = Number(polynomial.A % BigInt(pInBeta));
-        const a = FastMod(AA, pInBeta, sInv);
-        invCache[i] = modInverseSmall(a, pInBeta);
+        //const a = Number(polynomial.A % BigInt(p));
+        const a = FastMod(AA, p);
+        invCache[i] = modInverseSmall(a, p);
       }
       const invA = invCache[i];
-      //const b = Number(polynomial.B % BigInt(pInBeta));
-      const b = FastMod(BB, pInBeta, sInv);
+      //const b = Number(polynomial.B % BigInt(p));
+      const b = FastMod(BB, p);
       if (invA === 0) {
         // single root:
-        // X = (2B)^-1*(-C) (mod p)
+        // x = (2B)^-1*(-C) (mod p)
         // skip as the performance is not better
         w.proot = sieveSize;
         w.proot2 = sieveSize;
       } else {
-        w.proot = fmod((-b + root) * invA - offset, pInBeta, sInv);
-        w.proot2 = fmod((-b - root) * invA - offset, pInBeta, sInv);
+        const x1 = (p - b + (p + root)) * invA - offset;
+        const x2 = (p - b + (p - root)) * invA - offset;
+        w.proot = (x1 - Math.floor(x1 * sInv) * p) | 0; // x1 mod p
+        w.proot2 = (x2 - Math.floor(x2 * sInv) * p) | 0; // x2 mod p
       }
     }
     invCacheKey = polynomial.A;
