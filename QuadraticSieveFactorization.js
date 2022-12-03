@@ -1036,7 +1036,9 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     let congruencesFound = 0;
     let last = start;
     while ((c = congruences.next().value) != undefined) {
-      const t = () => {throw new TypeError(N);};
+      const t = function () {
+        throw new TypeError(N);
+      };
       const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
       if (true) {
         congruencesFound += 1;
