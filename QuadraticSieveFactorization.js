@@ -398,14 +398,15 @@ function solve(matrixSize) {
   let nextSolution = null;
   let state = 1;
   const iterator = {
-    next: function solve(tmp) {
+    next: function solve(rawRowAndValue) {
       while (true) {
         if (state === 1) {
           state = 0;
           return {value: nextSolution, done: false};
         }
         state = 1;
-        const [rawRow, associatedValue] = tmp;
+        const rawRow = rawRowAndValue;
+        const associatedValue = rawRowAndValue;
         let row = new BitSet(matrixSize);
         const reverseColumns = true; // makes it much faster when the data is more dense from the beginning (?)
         for (let j = 0; j < rawRow.length; j += 1) {
@@ -670,7 +671,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const wheelLogs = [];
   const wheelRoots = [];
   const wheelStepInvs = [];
-  for (let i = 0; i < wheels0.length; i++) {
+  for (let i = 0; i < wheels0.length; i += 1) {
     const w = wheels0[i];
     wheels.push({step: w.step, proot: 0, proot2: 0});
     wheelLogs.push(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1));
