@@ -405,8 +405,8 @@ function solve(matrixSize) {
           return {value: nextSolution, done: false};
         }
         state = 1;
-        const rawRow = rawRowAndValue;
-        const associatedValue = rawRowAndValue;
+        const rawRow = rawRowAndValue[0];
+        const associatedValue = rawRowAndValue[1];
         let row = new BitSet(matrixSize);
         const reverseColumns = true; // makes it much faster when the data is more dense from the beginning (?)
         for (let j = 0; j < rawRow.length; j += 1) {
