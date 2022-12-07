@@ -56,6 +56,9 @@ function modInverseSmall(a, m) {
 }
 
 function ChineseRemainderTheorem(r1, r2, m1, m2) {
+  if (typeof r1 !== 'bigint' || typeof r2 !== 'bigint' || typeof m1 !== 'bigint' || typeof m2 !== 'bigint') {
+    throw new TypeError();
+  }
   // https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Case_of_two_moduli
   // x = r1 (mod m1)
   // x = r2 (mod m2)
@@ -90,7 +93,7 @@ function getSquareRootsModuloTwo(n, e = 1) {
   if (e >= 3) {
     if (n % 8 === 1) { // from Cohen H.
       const m = Math.pow(2, e);
-      const candidate = Number(getSquareRootsModuloTwo(n, e - 1)[0]);
+      const candidate = +getSquareRootsModuloTwo(n, e - 1)[0];
       const candidate2 = m / 4 - candidate;
       const r = (candidate * candidate) % m !== n ? candidate2 : candidate;
       return [r, m / 2 - r, m / 2 + r, m - r];
@@ -114,8 +117,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
     throw new TypeError();
   }
   const m = Math.pow(p, e);
-  n = n % m;
-  if (!(n > 0 && p > 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
+  if (!(n > 0 && n < m && p > 0 && e >= 1 && +n % +p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
     throw new RangeError();
   }
   if (p % 2 === 0) {
@@ -123,7 +125,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
   }
   // r**2 == n (mod p)
   if (e > 1) {
-    const x = squareRootModuloOddPrime(n, p, e - 1);
+    const x = squareRootModuloOddPrime(n % Math.pow(p, e - 1), p, e - 1);
     // x**2 = n mod p**(e - 1)
     // x1 = x + a * p**(e-1)
     // x1**2 = x**2 + (a * p**(e-1))**2 + 2*x*a*p**(e-1) = n mod p**e
@@ -214,7 +216,7 @@ function getSmoothFactorization(a, base) {
 
   let n = Number(value);
   while (i < base.length) {
-    const p = base[i];
+    const p = +base[i];
     while (n - Math.floor(n / p) * p === 0) {
       n /= p;
       result.push(p);
@@ -278,7 +280,7 @@ function L(N) {  // exp(sqrt(log(n)*log(log(n))))
 function product(array) {
   const n = array.length;
   const m = Math.floor(n / 2);
-  return n === 0 ? 1n : (n === 1 ? BigInt(array[0]) : product(array.slice(0, m)) * product(array.slice(m)));
+  return n === 0 ? 1n : (n === 1 ? BigInt(array[0]) : BigInt(product(array.slice(0, m))) * BigInt(product(array.slice(m))));
 }
 
 function modPowSmall(base, exponent, modulus) {
@@ -292,7 +294,7 @@ function modPowSmall(base, exponent, modulus) {
   while (exponent !== 0) {
     if (exponent % 2 === 0) {
       exponent /= 2;
-      base = (base * base) % modulus;
+      base = (+base * +base) % modulus;
     } else {
       exponent -= 1;
       accumulator = (accumulator * base) % modulus;
@@ -336,7 +338,7 @@ function BitSet(size) {
   this.size = size;
 }
 BitSet.prototype.nextSetBit = function (index) {
-  if (index >= this.size) {
+  if (+index >= +this.size) {
     return -1;
   }
   const data = this.data;
@@ -356,12 +358,12 @@ BitSet.prototype.nextSetBit = function (index) {
     r += BitSetWordSize - 1;
   } else {
     // https://stackoverflow.com/questions/61442006/whats-the-most-efficient-way-of-getting-position-of-least-significant-bit-of-a
-    r += 31 - Math.clz32(x & -x);
+    r += 31 - Math.clz32(x & -(+x));
   }
   return q * BitSetWordSize + r;
 };
 BitSet.prototype.toggle = function (index) {
-  if (index >= this.size) {
+  if (+index >= +this.size) {
     throw new RangeError();
   }
   const q = Math.floor(index / BitSetWordSize);
@@ -372,14 +374,14 @@ BitSet.prototype.xor = function (other) {
   const a = this.data;
   const b = other.data;
   const n = a.length;
-  if (n !== b.length || n % 4 !== 0) {
+  if (+n !== +b.length || n % 4 !== 0) {
     throw new RangeError();
   }
   for (let i = 0; i < n; i += 4) {
-    a[i + 0] ^= b[i + 0];
-    a[i + 1] ^= b[i + 1];
-    a[i + 2] ^= b[i + 2];
-    a[i + 3] ^= b[i + 3];
+    a[i + 0] ^= b[i + 0] | 0;
+    a[i + 1] ^= b[i + 1] | 0;
+    a[i + 2] ^= b[i + 2] | 0;
+    a[i + 3] ^= b[i + 3] | 0;
   }
 };
 BitSet.prototype.toString = function () {
@@ -420,7 +422,7 @@ function solve(matrixSize) {
           if (pivotRow != null) {
             // row-reduction:
             row.xor(pivotRow);
-            console.assert(row.nextSetBit(pivotColumn) > pivotColumn || row.nextSetBit(pivotColumn) === -1);
+            console.assert(+row.nextSetBit(pivotColumn) > +pivotColumn || row.nextSetBit(pivotColumn) === -1);
             row.toggle(pivotColumn);
           } else {
             //row.toggle(matrixSize + pivotColumn);
@@ -490,6 +492,9 @@ const useMultiplePolynomials = true;
 
 // (A * x + B)**2 - N = A * (A * x**2 + 2 * B * x + C), A * C = B**2 - N
 function QuadraticPolynomial(A, B, N, AFactors) {
+  if (typeof A !== 'bigint' || typeof B !== 'bigint' || typeof N !== 'bigint') {
+    throw new TypeError();
+  }
   const AC = (B * B - N);
   if (AC % A !== 0n) {
     throw new TypeError();
@@ -521,6 +526,9 @@ QuadraticPolynomial.generator = function (M, primes, N) {
     return getCombinations(elements.slice(1), k - 1).map(c => [elements[0]].concat(c)).concat(getCombinations(elements.slice(1), k));
   };
   const nthRootApprox = function (A, n) {
+    if (typeof A !== 'bigint') {
+      throw new TypeError();
+    }
     const e = bitLength(A);
     return Math.round(e <= 1023n ? Math.pow(Number(A), 1 / n) : Math.pow(Number(A >> (e - 1023n)), 1 / n) * Math.pow(2, Number(e - 1023n) / n));
   };
@@ -570,7 +578,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
         for (let i = 0; i < Bs.length; i += 1) {
           Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
         }
-        Bs.sort((a, b) => Number(a - b));
+        Bs.sort((a, b) => Number(BigInt(a) - BigInt(b)));
         for (let i = 0; i < Bs.length / 2; i += 1) {
           const B = Bs[i];
           polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes));
@@ -585,6 +593,9 @@ QuadraticPolynomial.prototype.X = function (x) {
   return (this.A * BigInt(x) + this.B);
 };
 QuadraticPolynomial.prototype.Y = function (x, s, primes) {
+  if (typeof x !== 'number') {
+    throw new RangeError();
+  }
   const Y = this.A * (x * x <= Number.MAX_SAFE_INTEGER ? BigInt(x * x) : (a => a * a)(BigInt(x))) + this.B * BigInt(2 * x) + this.C;
   if (Y % s !== 0n) {
     return null;
@@ -599,6 +610,9 @@ QuadraticPolynomial.prototype.Y = function (x, s, primes) {
   return this.AFactors.concat(YFactors);
 };
 QuadraticPolynomial.prototype.log2AbsY = function (x) {
+  if (typeof x !== 'number') {
+    throw new TypeError();
+  }
   //const v1 = Math.log2(Math.abs(Number(this.Y(x))));
   const v2 =  Math.log2(Math.abs((x - this.x1) * (x - this.x2))) + this.log2a;
   return v2;
@@ -621,7 +635,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let sieveSize1 = Number(sieveSize0 || 0);
   if (sieveSize1 === 0) {
     sieveSize1 = 3 * 2**14;
-    sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(primes[primes.length - 1], 1.15)));
+    sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
     if (sieveSize1 > 2.75 * 2**17) {
       sieveSize1 = Math.max(2.75 * 2**17, Math.floor(sieveSize1 / 2));
@@ -648,7 +662,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels0 = [];
   for (let i = 0; i < primes.length; i += 1) {
-    const p = primes[i];
+    const p = +primes[i];
     for (let beta = 1, pInBeta = p; pInBeta <= sieveSize || beta === 1; beta += 1, pInBeta *= p) {
       const nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
@@ -666,7 +680,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
     }
   }
-  wheels0.sort((a, b) => a.step - b.step);
+  wheels0.sort((a, b) => +a.step - +b.step);
   const wheels = [];
   const wheelLogs = [];
   const wheelRoots = [];
@@ -716,7 +730,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const pInBeta = wheel.step;
       const offset = Number(baseOffset % BigInt(pInBeta));
       wheel.proot = +wheelRoots[i] - offset;
-      wheel.proot2 = -wheelRoots[i] - offset;
+      wheel.proot2 = -(+wheelRoots[i]) - offset;
     }
   }
 
@@ -728,7 +742,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       for (let v = 0; v <= 1; v += 1) {
         const root = (v === 0 ? wheels[k].proot : wheels[k].proot2);
         if (root !== sieveSize) {
-          const x = BigInt(root + offset);
+          const x = BigInt(+root + offset);
           const X = (polynomial.A * x + polynomial.B);
           const Y = X * X - N;
           if (Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(wheels[k].step) !== 0n) {
@@ -801,12 +815,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
 
   const singleBlockSieve = function (limit, subsegmentEnd, s) {
+    if (typeof limit !== 'number' || typeof subsegmentEnd !== 'number' || typeof s !== 'number') {
+      throw new TypeError();
+    }
     for (let j = smallWheels; j < limit; j += 1) {
       const w = wheels[j];
       const step = w.step;
-      const log2p = wheelLogs[j];
-      let kpplusr = w.proot;
-      let kpplusr2 = w.proot2;
+      const log2p = +wheelLogs[j];
+      let kpplusr = w.proot | 0;
+      let kpplusr2 = w.proot2 | 0;
       while (kpplusr < subsegmentEnd) {
         SIEVE_SEGMENT[kpplusr] += log2p;
         kpplusr += step;
@@ -821,6 +838,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
 
   const copyWithin = function (array, target, start, end) {
+    if (typeof target !== 'number') {
+      throw new TypeError();
+    }
     const end2 = end - end % 2;
     let j = start;
     while (j < end2) {
