@@ -594,9 +594,12 @@ QuadraticPolynomial.prototype.X = function (x) {
 };
 QuadraticPolynomial.prototype.Y = function (x, s, primes) {
   if (typeof x !== 'number') {
+    throw new TypeError();
+  }
+  if (x * x >= 2**53) {
     throw new RangeError();
   }
-  const Y = this.A * (x * x <= Number.MAX_SAFE_INTEGER ? BigInt(x * x) : (a => a * a)(BigInt(x))) + this.B * BigInt(2 * x) + this.C;
+  const Y = this.A * BigInt(x * x) + this.B * BigInt(2 * x) + this.C;
   if (Y % s !== 0n) {
     return null;
   }
@@ -655,7 +658,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
   const SIEVE_SEGMENT = SIEVE_SEGMENT1.slice(0);
 
-  const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : Number(primes[primes.length - 1]));
+  const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
   const twoB = log2B + Math.min(8, log2B);
   const largePrimes = new Map(); // faster (?)
 
@@ -759,11 +762,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //+some optimizations to minimize bigint usage and modInverseSmall calls
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
-    const useCache = polynomial.A === invCacheKey;
+    const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
     for (let i = 0; i < wheels.length; i += 1) {
       const w = wheels[i];
-      const p = w.step;
-      const root = wheelRoots[i];
+      const p = +w.step;
+      const root = +wheelRoots[i];
       const sInv = wheelStepInvs[i];
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
@@ -772,7 +775,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       const invA = invCache[i];
       //const b = Number(polynomial.B % BigInt(p));
-      const b = FastMod(BB, p);
+      const b = +FastMod(BB, p);
       if (invA === 0) {
         // single root:
         // x = (2B)^-1*(-C) (mod p)
@@ -792,7 +795,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const gcd = function (a, b) {
     while (b !== 0) {
-      const r = a % b;
+      const r = +a % +b;
       a = b;
       b = r;
     }
@@ -838,7 +841,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
 
   const copyWithin = function (array, target, start, end) {
-    if (typeof target !== 'number') {
+    if (typeof target !== 'number' || typeof start !== 'number' || typeof end !== 'number') {
       throw new TypeError();
     }
     const end2 = end - end % 2;
@@ -856,25 +859,28 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
 
   const updateSieveSegment = function (segmentStart) {
+    if (typeof segmentStart !== 'number') {
+      throw new TypeError();
+    }
     let cycleLength = 1;
     SIEVE_SEGMENT[0] = -0;
     for (let j = 0; j < smallWheels; j += 1) {
-      const newCycleLength = lcm(cycleLength, wheels[j].step);
-      for (let i = cycleLength; i < newCycleLength; i += cycleLength) {
+      const newCycleLength = +lcm(cycleLength, wheels[j].step);
+      for (let i = +cycleLength; i < newCycleLength; i += +cycleLength) {
         copyWithin(SIEVE_SEGMENT, i, 0, Math.min(newCycleLength - i, cycleLength));
       }
       cycleLength = newCycleLength;
       const w = wheels[j];
-      const step = w.step;
-      const log2p = wheelLogs[j];
-      for (let k = (w.proot + cycleLength - segmentStart % cycleLength) % step; k < cycleLength; k += step) {
+      const step = +w.step;
+      const log2p = +wheelLogs[j];
+      for (let k = (+w.proot + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
-      for (let k = (w.proot2 + cycleLength - segmentStart % cycleLength) % step; k < cycleLength; k += step) {
+      for (let k = (+w.proot2 + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
     }
-    for (let i = cycleLength; i < segmentSize; i += cycleLength) {
+    for (let i = +cycleLength; i < segmentSize; i += +cycleLength) {
       copyWithin(SIEVE_SEGMENT, i, 0, Math.min(segmentSize - i, cycleLength));
     }
     //for (let j = 0; j < segmentSize; j += 1) {
@@ -962,8 +968,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           //Note: separate loop over "smooth entries" is better for performance, seems
           for (let i = i1 + 1; i < smoothEntries.length; i += 1) {
             const x = smoothEntries[i];
-            const value = smoothEntries2[i];
-            const threshold = polynomial.log2AbsY(x);
+            const value = +smoothEntries2[i];
+            const threshold = +polynomial.log2AbsY(x);
             if (threshold - value < 1) {
               const X = polynomial.X(x);
               const Y = polynomial.Y(x, 1n, primes);
@@ -1008,7 +1014,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
 function gcd(a, b) {
   while (b !== 0n) {
-    const r = a % b;
+    const r = BigInt(a) % BigInt(b);
     a = b;
     b = r;
   }
@@ -1020,17 +1026,20 @@ function abs(x) {
 }
 
 function indexOf(sortedArray, x) {
+  if (typeof x !== 'number') {
+    throw new TypeError();
+  }
   let min = 0;
   let max = sortedArray.length - 1;
   while (min < max) {
     const mid = Math.ceil((min + max) / 2);
-    if (sortedArray[mid] > x) {
+    if (+sortedArray[mid] > x) {
       max = mid - 1;
     } else {
       min = mid;
     }
   }
-  if (sortedArray[min] === x) {
+  if (+sortedArray[min] === x) {
     return min;
   }
   return -1;
@@ -1062,7 +1071,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
       const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
       if (true) {
         congruencesFound += 1;
-        const now = Date.now();
+        const now = +Date.now();
         if (now - last > 5000 || solution != null) {
           console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
                         'expected time: ', (now - start) / congruencesFound * primeBase.length,
@@ -1077,7 +1086,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const x = X;
         const y = BigInt(sqrt(Y));
         console.assert(y * y === BigInt(Y));
-        const g = gcd(abs(x + y), N);
+        const g = BigInt(gcd(abs(x + y), N));
         if (g !== 1n && g !== N) {
           return g;
         }
