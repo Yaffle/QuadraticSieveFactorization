@@ -16,28 +16,39 @@ function modPow(base, exponent, modulus) {
   return accumulator;
 }
 
-function fmod(a, b) {
-  return (a - Math.floor(a / b) * b);
-}
 function FastModBigInt(a) {
   const array = [];
   while (a !== 0n) {
-    const x = Number(BigInt.asUintN(52, a));
+    const x = Number(BigInt.asUintN(51, a));
     array.push(x);
-    a >>= 52n;
+    a >>= 51n;
   }
   return array;
 }
 function FastMod(array, integer) {
   const n = array.length - 1;
-  let result = fmod(array[n], integer);
+  let result = array[n];
+  const v = integer;
+  const inv = (1 + 2**-52) / v;
+  result -= Math.floor(result * inv) * v;
   if (n > 0) {
-    let x = fmod(2**52, integer);
-    for (let i = n - 1; i >= 0; i -= 1) {
-      result = fmod(result * x + array[i], integer);
-    }
+    const x = 2**51 - Math.floor(2**51 * inv) * v;
+    let i = n;
+    do {
+      i -= 1;
+      result = result * x + array[i];
+      result -= Math.floor(result * inv) * v;
+    } while (i !== 0);
   }
-  return result | 0;
+  return result;
+}
+
+function range(start, end) {
+  var a = [];
+  for (let i = start; i <= end; i += 1) {
+    a.push(i);
+  }
+  return a;
 }
 
 function isPrime(n) {
@@ -91,13 +102,9 @@ function isPrime(n) {
   if (i < values.length) {
     bases = primes.slice(0, i + 1);
   } else {
+    // https://primes.utm.edu/prove/prove2_3.html
     const lnN = Number(log2(n)) * Math.log(2);
-    const max = Math.floor(2 * lnN * Math.log(lnN));
-    const range = new Array(max - 2 + 1);
-    for (let i = 2; i <= max; i += 1) {
-      range[i - 2] = i;
-    }
-    bases = range;
+    bases = range(2, Math.floor(1 / Math.log(2) * lnN * Math.log(lnN)));
   }
   for (const a of bases) {
     let x = modPow(BigInt(a), d, n);
