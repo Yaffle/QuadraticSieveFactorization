@@ -569,7 +569,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
           //console.log(elements.length, combinations.length, p**k / Number(S));
         }
         const qPrimes = combinations.pop().reduce((array, pair) => array.concat(pair), []);
-        const q = qPrimes.reduce((p, a) => p * BigInt(a), 1n);
+        const q = BigInt(qPrimes.reduce((p, a) => p * BigInt(a), 1n));
         const qInv = modInverse(q % N, N);
         if (qInv === 0n) {
           //TODO: what to do here - ?
@@ -1064,9 +1064,9 @@ function squareRootOfPrimesProduct(primes) {
   }
   // we cannot just compute product as it is larger 2**(2**20) (max BigInt in Firefox)
   const array = primes.slice(0);
-  array.sort((a, b) => a - b);
+  array.sort((a, b) => +a - +b);
   for (let i = 0; i < array.length; i += 2) {
-    if (i + 1 >= array.length || array[i] !== array[i + 1]) {
+    if (i + 1 >= array.length || +array[i] !== +array[i + 1]) {
       throw new RangeError();
     }
     array[i] = Math.abs(array[i]);
