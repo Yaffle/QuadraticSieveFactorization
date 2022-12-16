@@ -637,6 +637,9 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 
 
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
+  if (typeof N !== 'bigint') {
+    throw new TypeError();
+  }
   let sieveSize1 = Number(sieveSize0 || 0);
   if (sieveSize1 === 0) {
     sieveSize1 = 3 * 2**14;
@@ -647,13 +650,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
   //console.debug('sieveSize1', Math.log2(sieveSize1));
-  sieveSize1 += sieveSize1 % 2;
-  const sieveSize = sieveSize1;
 
-  if (typeof N !== 'bigint') {
-    throw new TypeError();
-  }
-  const segmentSize = Math.ceil(sieveSize / Math.ceil(sieveSize / (2.75 * 2**17)));
+  const q = Math.ceil(sieveSize1 / (2.75 * 2**17));
+  const segmentSize = Math.ceil(Math.ceil(sieveSize1 / q) / 2) * 2;
+  const sieveSize = segmentSize * q;
   const SIEVE_SEGMENT1 = [];
   for (let i = 0; i < segmentSize; i += 1) {
     SIEVE_SEGMENT1.push(-0);
@@ -1104,7 +1104,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const now = +Date.now();
         if (now - last > 5000 || solution != null) {
           console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
-                        'expected time: ', (now - start) / congruencesFound * primeBase.length,
+                        'expected time: ', Math.round((now - start) / congruencesFound * primeBase.length),
                         'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
                         'polynomials used: ', QuadraticSieveFactorization.polynomialsCounter);
           last = now;
