@@ -89,11 +89,11 @@ function squareRootsModuloOddPrimesProduct(n, primes, e = 1) {
   return result;
 }
 
-function getSquareRootsModuloTwo(n, e = 1) {
+function squareRootsModuloTwo(n, e = 1) {
   if (e >= 3) {
     if (n % 8 === 1) { // from Cohen H.
       const m = Math.pow(2, e);
-      const candidate = +getSquareRootsModuloTwo(n, e - 1)[0];
+      const candidate = +squareRootsModuloTwo(n, e - 1)[0];
       const candidate2 = m / 4 - candidate;
       const r = (candidate * candidate) % m !== n ? candidate2 : candidate;
       return [r, m / 2 - r, m / 2 + r, m - r];
@@ -277,10 +277,12 @@ function L(N) {  // exp(sqrt(log(n)*log(log(n))))
   return Math.exp(Math.sqrt(lnn * Math.log(lnn)));
 }
 
-function product(array) {
-  const n = array.length;
-  const m = Math.floor(n / 2);
-  return n === 0 ? 1n : (n === 1 ? BigInt(array[0]) : BigInt(product(array.slice(0, m))) * BigInt(product(array.slice(m))));
+function productModM(array, m) {
+  let p = 1n;
+  for (let i = 0; i < array.length; i += 1) {
+    p = (p * BigInt(array[i])) % m;
+  }
+  return p;
 }
 
 function modPowSmall(base, exponent, modulus) {
@@ -567,7 +569,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
           //console.log(elements.length, combinations.length, p**k / Number(S));
         }
         const qPrimes = combinations.pop().reduce((array, pair) => array.concat(pair), []);
-        const q = product(qPrimes);
+        const q = qPrimes.reduce((p, a) => p * BigInt(a), 1n);
         const qInv = modInverse(q % N, N);
         if (qInv === 0n) {
           //TODO: what to do here - ?
@@ -672,7 +674,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         //console.warn('N has a factor in prime base', N, p);
       } else {
         if (p === 2) {
-          const roots = getSquareRootsModuloTwo(nmodpInBeta, beta);
+          const roots = squareRootsModuloTwo(nmodpInBeta, beta);
           for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
             wheels0.push({step: pInBeta, proot: 0, proot2: 0, p: p, root: roots[j] | 0});
           }
@@ -1045,6 +1047,34 @@ function indexOf(sortedArray, x) {
   return -1;
 }
 
+function flat(array) {
+  const result = [];
+  for (let i = 0; i < array.length; i += 1) {
+    const sub = array[i];
+    for (let j = 0; j < sub.length; j += 1) {
+      result.push(sub[j]);
+    }
+  }
+  return result;
+}
+
+function squareRootOfPrimesProduct(primes) {
+  if (primes.length === 1 && primes[0] === 0) {
+    return primes;
+  }
+  // we cannot just compute product as it is larger 2**(2**20) (max BigInt in Firefox)
+  const array = primes.slice(0);
+  array.sort((a, b) => a - b);
+  for (let i = 0; i < array.length; i += 2) {
+    if (i + 1 >= array.length || array[i] !== array[i + 1]) {
+      throw new RangeError();
+    }
+    array[i] = Math.abs(array[i]);
+    array[i + 1] = 1;
+  }
+  return array;
+}
+
 function QuadraticSieveFactorization(N) { // N - is not a prime
   N = BigInt(N);
   for (let k = 1n;; k += 1n) {
@@ -1081,11 +1111,9 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         }
       }
       if (solution != null) {
-        const X = product(solution.map(c => c.X));
-        const Y = product(solution.map(c => product(c.Y))); // = sqrt(X**2 % N)
-        const x = X;
-        const y = BigInt(sqrt(Y));
-        console.assert(y * y === BigInt(Y));
+        const x = productModM(solution.map(c => c.X), N);
+        const Y = flat(solution.map(c => c.Y)); // Y mod N === X^2 mod N
+        const y = productModM(squareRootOfPrimesProduct(Y, N), N);
         const g = BigInt(gcd(abs(x + y), N));
         if (g !== 1n && g !== N) {
           return g;
