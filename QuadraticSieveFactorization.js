@@ -929,6 +929,22 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
+  function checkFactorization(x) {
+    let p = 0;
+    for (let n = 0; n < wheels.length; n += 1) {
+      const w = wheels[n];
+      for (let v = 0; v <= 1; v += 1) {
+        if ((x - (v === 0 ? w.proot : w.proot2) - (n < smallWheels ? 0 : segmentSize)) % w.step === 0) {
+          if (polynomial.AFactors.indexOf(w.step) === -1) {
+            //console.log(w.step);
+            p += wheelLogs[n];
+          }
+        }
+      }
+    }
+    return p;
+  }
+
   QuadraticSieveFactorization.lpCounter = 0;
   let i1 = -1;
   let k = 0;
@@ -980,16 +996,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N), done: false};
               } else {
                 console.count('?');
-                /*let p = 1n;
-                for (let n = 0; n < wheels.length; n += 1) {
-                  const w = wheels[n];
-                  for (let v = 0; v <= 1; v += 1) {
-                    if ((x - (v === 0 ? wheels[n].proot : wheels[n].proot2)) % w.step === 0) {
-                      console.log(w);
-                      p *= BigInt(w.step);
-                    }
-                  }
-                }*/
+                //console.log(threshold, value, checkFactorization(x - offset));
               }
             } else {
               if (threshold - value < twoB) {
