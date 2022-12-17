@@ -879,12 +879,12 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       cycleLength = newCycleLength;
       const w = wheels[j];
-      const step = +w.step;
+      const step = w.step | 0;
       const log2p = +wheelLogs[j];
-      for (let k = (+w.proot + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
+      for (let k = ((w.proot | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
-      for (let k = (+w.proot2 + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
+      for (let k = ((w.proot2 | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
     }
@@ -940,7 +940,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     for (let n = 0; n < wheels.length; n += 1) {
       const w = wheels[n];
       for (let v = 0; v <= 1; v += 1) {
-        if ((x - (v === 0 ? w.proot : w.proot2) - (n < smallWheels ? 0 : segmentSize)) % w.step === 0) {
+        if ((x - (v === 0 ? (w.proot | 0) : (w.proot2 | 0)) - (n < smallWheels ? 0 : segmentSize)) % w.step === 0) {
           if (polynomial.AFactors.indexOf(w.step) === -1) {
             console.log(w.step);
             p += wheelLogs[n];
