@@ -784,9 +784,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const x2 = (p - b + (p - root)) * invA - offset;
         const r1 = (x1 - Math.floor(x1 * sInv) * p) | 0; // x1 mod p
         const r2 = (x2 - Math.floor(x2 * sInv) * p) | 0; // x2 mod p
-        const max = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
-        w.proot = r1 + r2 - max;
-        w.proot2 = max;
+        w.proot = r2 + ((r1 - r2) & ((r1 - r2) >> 31));
+        w.proot2 = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
       }
     }
     invCacheKey = polynomial.A;
@@ -849,20 +848,21 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
 
   const copyWithin = function (array, target, start, end) {
-    if (typeof target !== 'number' || typeof start !== 'number' || typeof end !== 'number') {
-      throw new TypeError();
-    }
-    const end2 = end - end % 2;
+    const endm1 = end - 1;
+    let i = target;
     let j = start;
-    while (j < end2) {
-      array[target + j] = array[j];
+    while (j < endm1) {
+      array[i] = array[j];
       j += 1;
-      array[target + j] = array[j];
+      i += 1;
+      array[i] = array[j];
       j += 1;
+      i += 1;
     }
     if (j < end) {
-      array[target + j] = array[j];
+      array[i] = array[j];
       j += 1;
+      i += 1;
     }
   };
 
