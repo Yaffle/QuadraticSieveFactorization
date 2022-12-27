@@ -681,7 +681,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const getSmallWheels = function () {
     let p = 1;
     let i = 0;
-    while (i < wheels.length && lcm(p, wheels[i].step) <= segmentSize) {
+    while (i < wheels.length && lcm(p, wheels[i].step) <= segmentSize / 5) {
       p = lcm(p, wheels[i].step);
       i += 1;
     }
@@ -722,21 +722,42 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
-  const copyWithin = function (array, target, start, end) {
-    const endm1 = end - 1;
-    let i = target;
-    let j = start;
-    while (j < endm1) {
-      array[i] = array[j];
-      j += 1;
-      i += 1;
-      array[i] = array[j];
-      j += 1;
-      i += 1;
+  const copyCycle = function (array, cycleLength, limit) {
+    if (limit > array.length || cycleLength > array.length) {
+      throw new RangeError();
     }
-    if (j < end) {
-      array[i] = array[j];
-      j += 1;
+    let i = 0;
+    while (i + 3 < cycleLength) {
+      const a = array[i + 0];
+      const b = array[i + 1];
+      const c = array[i + 2];
+      const d = array[i + 3];
+      let j = cycleLength + i;
+      while (j + 3 < limit) {
+        array[j + 0] = a;
+        array[j + 1] = b;
+        array[j + 2] = c;
+        array[j + 3] = d;
+        j += cycleLength;
+      }
+      if (j + 0 < limit) {
+        array[j + 0] = a;
+      }
+      if (j + 1 < limit) {
+        array[j + 1] = b;
+      }
+      if (j + 2 < limit) {
+        array[j + 2] = c;
+      }
+      i += 4;
+    }
+    while (i < cycleLength) {
+      const a = array[i];
+      let j = cycleLength + i;
+      while (j < limit) {
+        array[j] = a;
+        j += cycleLength;
+      }
       i += 1;
     }
   };
@@ -749,9 +770,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     SIEVE_SEGMENT[0] = -0;
     for (let j = 0; j < smallWheels; j += 1) {
       const newCycleLength = +lcm(cycleLength, wheels[j].step);
-      for (let i = +cycleLength; i < newCycleLength; i += +cycleLength) {
-        copyWithin(SIEVE_SEGMENT, i, 0, Math.min(newCycleLength - i, cycleLength));
-      }
+      copyCycle(SIEVE_SEGMENT, cycleLength, newCycleLength);
       cycleLength = newCycleLength;
       const w = wheels[j];
       const step = w.step | 0;
@@ -763,9 +782,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         SIEVE_SEGMENT[k] += log2p;
       }
     }
-    for (let i = +cycleLength; i < segmentSize; i += +cycleLength) {
-      copyWithin(SIEVE_SEGMENT, i, 0, Math.min(segmentSize - i, cycleLength));
-    }
+    copyCycle(SIEVE_SEGMENT, cycleLength, segmentSize);
     //for (let j = 0; j < segmentSize; j += 1) {
     //  SIEVE_SEGMENT[j] = -0;
     //}
@@ -937,7 +954,7 @@ function indexOf(sortedArray, x) {
   return -1;
 }
 
-function computeY(primeBase, solution) {
+function computeY(primeBase, solution, N) {
   const Y = new Array(primeBase.length + 1).fill(0);
   for (let i = 0; i < solution.length; i += 1) {
     const v = solution[i].v;
@@ -970,7 +987,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
-    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 10 : 6))), (1 << 25) - 1), 320);
+    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), (1 << 25) - 1), 320);
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
@@ -1013,7 +1030,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
             x = (x * solution[i].c.X) % N;
           }
           // we cannot just compute product as it is larger 2**(2**20) (max BigInt in Firefox)
-          let y = computeY(primeBase, solution); // Y mod N === X^2 mod N
+          let y = computeY(primeBase, solution, N); // Y mod N === X^2 mod N
           const g = BigInt(gcd(abs(x + y), N));
           if (g !== 1n && g !== N) {
             return g;
