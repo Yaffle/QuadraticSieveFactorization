@@ -279,14 +279,6 @@ function L(N) {  // exp(sqrt(log(n)*log(log(n))))
   return Math.exp(Math.sqrt(lnn * Math.log(lnn)));
 }
 
-function productModM(array, m) {
-  let p = 1n;
-  for (let i = 0; i < array.length; i += 1) {
-    p = (p * BigInt(array[i])) % m;
-  }
-  return p;
-}
-
 function modPowSmall(base, exponent, modulus) {
   if (typeof base !== 'number' || typeof exponent !== 'number' || typeof modulus !== 'number') {
     throw new TypeError();
@@ -303,6 +295,19 @@ function modPowSmall(base, exponent, modulus) {
       exponent -= 1;
       accumulator = (accumulator * base) % modulus;
     }
+  }
+  return accumulator;
+}
+
+function modPow(base, exponent, modulus) {
+  let accumulator = 1n;
+  while (exponent !== 0n) {
+    if (BigInt.asUintN(1, exponent) === 1n) {
+      exponent -= 1n;
+      accumulator = (accumulator * base) % modulus;
+    }
+    exponent >>= 1n;
+    base = (base * base) % modulus;
   }
   return accumulator;
 }
@@ -932,32 +937,32 @@ function indexOf(sortedArray, x) {
   return -1;
 }
 
-function flat(array) {
-  const result = [];
-  for (let i = 0; i < array.length; i += 1) {
-    const sub = array[i];
-    for (let j = 0; j < sub.length; j += 1) {
-      result.push(sub[j]);
+function computeY(primeBase, solution) {
+  const Y = new Array(primeBase.length + 1).fill(0);
+  for (let i = 0; i < solution.length; i += 1) {
+    const v = solution[i].v;
+    for (let j = 0; j < v.length; j += 1) {
+      Y[v[j]] += 1;
     }
   }
-  return result;
-}
-
-function squareRootOfPrimesProduct(primes) {
-  if (primes.length === 1 && primes[0] === 0) {
-    return primes;
-  }
-  // we cannot just compute product as it is larger 2**(2**20) (max BigInt in Firefox)
-  const array = primes.slice(0);
-  array.sort((a, b) => +a - +b);
-  for (let i = 0; i < array.length; i += 2) {
-    if (i + 1 >= array.length || +array[i] !== +array[i + 1]) {
+  let y = 1n;
+  for (let i = 0; i < Y.length; i += 1) {
+    if (Y[i] % 2 !== 0) {
       throw new RangeError();
     }
-    array[i] = Math.abs(array[i]);
-    array[i + 1] = 1;
+    if (i !== 0) {
+      const p = primeBase[i - 1];
+      const e = Y[i] / 2;
+      if (e > 0) {
+        if (e <= 2) {
+          y = (y * BigInt(Math.pow(p, e))) % N;
+        } else {
+          y = (y * modPow(BigInt(p), BigInt(e), N)) % N;
+        }
+      }
+    }
   }
-  return array;
+  return y;
 }
 
 function QuadraticSieveFactorization(N) { // N - is not a prime
@@ -980,28 +985,39 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     let congruencesFound = 0;
     let last = start;
     while ((c = congruences.next().value) != undefined) {
-      const t = function () {
-        throw new TypeError(N);
-      };
-      const solution = c.Y.length === 1 && c.Y[0] === 0 ? [c] : solutions.next([c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t())), c]).value;
-      if (true) {
-        congruencesFound += 1;
-        const now = +Date.now();
-        if (now - last > 5000 || solution != null) {
-          console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
-                        'expected time: ', Math.round((now - start) / congruencesFound * primeBase.length),
-                        'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
-                        'polynomials used: ', QuadraticSieveFactorization.polynomialsCounter);
-          last = now;
-        }
-      }
-      if (solution != null) {
-        const x = productModM(solution.map(c => c.X), N);
-        const Y = flat(solution.map(c => c.Y)); // Y mod N === X^2 mod N
-        const y = productModM(squareRootOfPrimesProduct(Y, N), N);
-        const g = BigInt(gcd(abs(x + y), N));
+      if (c.Y.length === 1 && c.Y[0] === 0) {
+        const g = BigInt(gcd(abs(c.X), N));
         if (g !== 1n && g !== N) {
           return g;
+        }
+      } else {
+        const t = function () {
+          throw new TypeError(N);
+        };
+        const v = c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t()));
+        const solution = solutions.next([v, {c: c, v: v}]).value;
+        if (true) {
+          congruencesFound += 1;
+          const now = +Date.now();
+          if (now - last > 5000 || solution != null) {
+            console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
+                          'expected time: ', Math.round((now - start) / congruencesFound * primeBase.length),
+                          'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
+                          'polynomials used: ', QuadraticSieveFactorization.polynomialsCounter);
+            last = now;
+          }
+        }
+        if (solution != null) {
+          let x = 1n;
+          for (let i = 0; i < solution.length; i += 1) {
+            x = (x * solution[i].c.X) % N;
+          }
+          // we cannot just compute product as it is larger 2**(2**20) (max BigInt in Firefox)
+          let y = computeY(primeBase, solution); // Y mod N === X^2 mod N
+          const g = BigInt(gcd(abs(x + y), N));
+          if (g !== 1n && g !== N) {
+            return g;
+          }
         }
       }
     }
