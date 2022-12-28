@@ -6,7 +6,7 @@ function packedArray(n) {
   // `%DebugPrint(array)` in `node --allow-native-syntax`
   // see https://v8.dev/blog/elements-kinds
   const array = [];
-  for (let i = 0; i < n; i += 1) {
+  for (let i = 0; i < n; i++) {
     array.push(0);
   }
   return array.slice(0); // slice to reduce the size of the internal storage
@@ -95,7 +95,7 @@ function solve(matrixSize, bitsetRows = false) {
         } else {
           row = new BitSet(matrixSize);
           const reverseColumns = true; // makes it much faster when the data is more dense from the beginning (?)
-          for (let j = 0; j < rawRow.length; j += 1) {
+          for (let j = 0; j < rawRow.length; j++) {
             const unitaryColumn = rawRow[j];
             const c = reverseColumns ? matrixSize - 1 - unitaryColumn : unitaryColumn;
             row.toggle(c);
@@ -224,7 +224,7 @@ function sparseSolve(columnsCount) {
 
   function getKthLargest(array, k) {
     array.sort((a, b) => a - b);
-    return array.at(-k);
+    return array[Math.max(array.length - k, 0)];
   }
 
   function deleteNonSparseColumns(sparseMatrix, count) {
@@ -299,9 +299,9 @@ function sparseSolve(columnsCount) {
     }
     const newColumnsCount = k;
 
-    newMatrix = M.map(row => {
+    newMatrix = M.map(function (row) {
       const newRow = new BitSet(newColumnsCount);
-      for (let j = 0; j < row.length; j += 1) {
+      for (let j = 0; j < row.length; j++) {
         const e = newColumnIds[row[j]];
         if (e !== -1) {
           newRow.toggle(newColumnsCount - 1 - e);
@@ -322,7 +322,7 @@ function sparseSolve(columnsCount) {
     
     /*console.time('n1');
     const template = packedArray(newColumnsCount);
-    newMatrix = newMatrix.map(row => {
+    newMatrix = newMatrix.map(function (row) {
       if (row == null) {
         return null;
       }
