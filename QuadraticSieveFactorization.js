@@ -303,14 +303,16 @@ function modPow(base, exponent, modulus) {
   if (typeof base !== 'bigint' || typeof exponent !== 'bigint' || typeof modulus !== 'bigint') {
     throw new TypeError();
   }
+  let e = exponent;
+  let b = base;
   let accumulator = 1n;
-  while (exponent !== 0n) {
-    if (BigInt.asUintN(1, exponent) === 1n) {
-      exponent -= 1n;
-      accumulator = (accumulator * base) % modulus;
+  while (e !== 0n) {
+    if (BigInt.asUintN(1, e) === 1n) {
+      e -= 1n;
+      accumulator = (accumulator * b) % modulus;
     }
-    exponent >>= 1n;
-    base = (base * base) % modulus;
+    e >>= 1n;
+    b = (b * b) % modulus;
   }
   return accumulator;
 }
