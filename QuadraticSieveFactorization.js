@@ -416,7 +416,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   };
   const S = BigInt(sqrt(2n * N)) / BigInt(M);
   const e = log(S) / Math.log(2);
-  if (primes.length < 16) {
+  if (primes.length < 42) {
     throw new TypeError();//TODO:
   }
   const max1 = Math.log2(primes[primes.length - 1]);
@@ -1000,7 +1000,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
-    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), (1 << 25) - 1), 320);
+    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), (1 << 25) - 1), 1024);
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
