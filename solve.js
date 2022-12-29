@@ -404,4 +404,4 @@ solve.sparseSolve = sparseSolve;
 sparseSolve.solve = solve;
 sparseSolve.sparseSolve = sparseSolve;
 
-export default sparseSolve;
+export default solve;

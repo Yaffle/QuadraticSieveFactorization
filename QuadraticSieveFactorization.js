@@ -300,6 +300,9 @@ function modPowSmall(base, exponent, modulus) {
 }
 
 function modPow(base, exponent, modulus) {
+  if (typeof base !== 'bigint' || typeof exponent !== 'bigint' || typeof modulus !== 'bigint') {
+    throw new TypeError();
+  }
   let accumulator = 1n;
   while (exponent !== 0n) {
     if (BigInt.asUintN(1, exponent) === 1n) {
@@ -723,6 +726,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
 
   const copyCycle = function (array, cycleLength, limit) {
+    if (typeof limit !== 'number' || typeof cycleLength !== 'number') {
+      throw new TypeError();
+    }
     if (limit > array.length || cycleLength > array.length) {
       throw new RangeError();
     }
@@ -931,6 +937,9 @@ function gcd(a, b) {
 }
 
 function abs(x) {
+  if (typeof x !== 'bigint') {
+    throw new TypeError();
+  }
   return x < 0n ? -x : x;
 }
 
@@ -983,7 +992,9 @@ function computeY(primeBase, solution, N) {
 }
 
 function QuadraticSieveFactorization(N) { // N - is not a prime
-  N = BigInt(N);
+  if (typeof N !== 'bigint') {
+    throw new TypeError();
+  }
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
@@ -995,7 +1006,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
       }
     }
     const congruences = congruencesUsingQuadraticSieve(primeBase, kN); // congruences X_k^2 = Y_k mod N, where Y_k is smooth over the prime base
-    const solutions = solve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
+    const solutions = solve.sparseSolve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
     solutions.next();
     let c = null;
     const start = Date.now();
