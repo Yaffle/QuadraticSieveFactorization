@@ -217,6 +217,7 @@ SparseGF2Matrix.prototype.reduce = function (rowIndex, xors) {
 
 // structured Gaussian elimination:
 // see The Factorization of the Ninth Fermat Number (Author(s): A. K. Lenstra, H. W. Lenstra, Jr., M. S. Manasse, J. M. Pollard), page 344
+// and Solving Large Sparse Linear Systems Over Finite Fields (B. A. LaMacchia • A.M. Odlyzko)
 function sparseSolve(columnsCount) {
   if (columnsCount < 1024 * 2) {
     return solve(columnsCount);

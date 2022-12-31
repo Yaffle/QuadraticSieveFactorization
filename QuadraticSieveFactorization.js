@@ -1,6 +1,7 @@
 /*jshint esversion:11, bitwise:false*/
 
 import solve from './solve.js';
+import sqrtMod from './sqrtMod.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
@@ -158,8 +159,12 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
       return r;
     }
   }
+  if (true) {
+    const r = sqrtMod(n, p);
+    return Math.min(r, p - r);
+  }
   let rrmnmodp = 1 - n; // r**2 % p - n
-  for (let tworm1 = -1; tworm1 < p; tworm1 += 2) {
+  for (let tworm1 = -1; true; tworm1 += 2) {
     rrmnmodp += tworm1;
     if (rrmnmodp >= p) {
       rrmnmodp -= p;
