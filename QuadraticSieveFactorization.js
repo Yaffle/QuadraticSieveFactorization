@@ -649,9 +649,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
     for (let i = 0; i < wheels.length; i += 1) {
       const w = wheels[i];
-      const p = +w.step;
-      const root = +wheelRoots[i];
-      const sInv = wheelStepInvs[i];
+      const p = w.step | 0;
+      const root = wheelRoots[i] | 0;
+      const sInv = +wheelStepInvs[i];
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
         const a = FastMod(AA, p);
@@ -850,7 +850,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if ((x - (v === 0 ? (w.proot | 0) : (w.proot2 | 0)) - (n < smallWheels ? 0 : segmentSize)) % w.step === 0) {
           if (polynomial.AFactors.indexOf(w.step) === -1) {
             console.log(w.step);
-            p += wheelLogs[n];
+            p += +wheelLogs[n];
           }
         }
       }
@@ -878,9 +878,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             for (let j = 0; j < wheels.length; j += 1) {
               const w = wheels[j];
               const step = w.step;
-              let r1 = (+wheelRoots[j] - baseOffsets[j] - offset) % step;
+              let r1 = (0 + (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
               r1 += (r1 < 0 ? step : 0);
-              let r2 = (-(+wheelRoots[j]) - baseOffsets[j] - offset) % step;
+              let r2 = (0 - (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
               r2 += (r2 < 0 ? step : 0);
               w.proot = Math.min(r1, r2);
               w.proot2 = Math.max(r1, r2);
