@@ -527,7 +527,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = 3 * 2**14;
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
-    if (sieveSize1 > 2.75 * 2**17) {
+    if (sieveSize1 > 2**21) {
+      sieveSize1 = Math.max(2**21, Math.floor(sieveSize1 / 4));
+    } else if (sieveSize1 > 2.75 * 2**17) {
       sieveSize1 = Math.max(2.75 * 2**17, Math.floor(sieveSize1 / 2));
     }
   }
@@ -706,9 +708,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       throw new TypeError();
     }
     for (let j = smallWheels; j < limit; j += 1) {
-      const w = wheels[j];
-      const step = w.step;
       const log2p = +wheelLogs[j];
+      const w = wheels[j];
+      const step = w.step | 0;
       let kpplusr = w.proot | 0;
       let kpplusr2 = w.proot2 | 0;
       if (kpplusr > kpplusr2) {
@@ -1005,7 +1007,11 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   for (let k = 1n;; k += 1n) {
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
-    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), (1 << 25) - 1), 1024);
+
+    // to limit memory usage:
+    const limit = Math.min(2**23, (1 << 25) - 1);
+    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), limit), 1024);
+
     const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
