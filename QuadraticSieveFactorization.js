@@ -372,7 +372,7 @@ function FastMod(array, integer) {
 //squareRootModuloOddPrime(4865648, 9749, 2)  // huge size of p**e
 
 function exp2(x) {
-  return Math.pow(2, Math.floor(x)) * Math.exp(Math.LN2 * (x - Math.floor(x)));
+  return Math.round(Math.pow(2, Math.floor(x)) * Math.exp(Math.LN2 * (x - Math.floor(x))));
 }
 
 const useMultiplePolynomials = true;
@@ -707,13 +707,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (typeof limit !== 'number' || typeof subsegmentEnd !== 'number' || typeof s !== 'number') {
       throw new TypeError();
     }
+    if (subsegmentEnd > SIEVE_SEGMENT.length || limit > wheels.length || limit > wheelLogs.length || smallWheels < 0) {
+      throw new RangeError();
+    }
     for (let j = smallWheels; j < limit; j += 1) {
       const log2p = +wheelLogs[j];
       const w = wheels[j];
       const step = w.step | 0;
       let kpplusr = w.proot | 0;
       let kpplusr2 = w.proot2 | 0;
-      if (kpplusr > kpplusr2) {
+      if (kpplusr > kpplusr2 || kpplusr < 0) {
         throw new RangeError();
       }
       while (kpplusr2 < subsegmentEnd) {
@@ -915,7 +918,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
               }
             } else {
               if (threshold - value < twoB) {
-                const p = Math.round(exp2(threshold - value));
+                const p = exp2(threshold - value);
                 const c = lpStrategy(p, polynomial, x);
                 if (c != null) {
                   i1 = i;
