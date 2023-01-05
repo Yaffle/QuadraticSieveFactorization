@@ -27,3 +27,7 @@ See https://www.rieselprime.de/ziki/Factorization for the more detailed usage no
 
 # Demo
 See [demo](https://yaffle.github.io/QuadraticSieveFactorization/demo.html).
+
+# Performance
+
+It took almost 11 hours to factor [RSA-100](https://en.wikipedia.org/wiki/RSA_numbers#RSA-100) on Core i7-1165G7 .
