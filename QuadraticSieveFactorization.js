@@ -1011,7 +1011,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     const kN = k * N;
     // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
 
-    // to limit memory usage:
+    // to limit memory usage during "solve" to 2GB:
     const limit = Math.min(2**23, (1 << 25) - 1);
     const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), limit), 1024);
 
