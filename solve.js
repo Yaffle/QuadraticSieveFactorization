@@ -268,11 +268,11 @@ function sparseSolve(columnsCount) {
   let lastJ = -1;
 
   function calculateNewMatrix() {
-    const FIRST_SPARSE_PRIME = 1024;
+    const FIRST_SPARSE_PRIME_INDEX = 2585;
 
     const sparseMatrix = new SparseGF2Matrix(M.length, columnsCount);
     for (let i = 0; i < M.length; i++) {
-      sparseMatrix.addRow(M[i].filter(p => p >= FIRST_SPARSE_PRIME), i);
+      sparseMatrix.addRow(M[i].filter(p => p >= FIRST_SPARSE_PRIME_INDEX), i);
     }
 
     const eliminatedColumns = new Array(columnsCount).fill(false);
