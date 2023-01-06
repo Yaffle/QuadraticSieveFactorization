@@ -717,7 +717,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const smallWheels = getSmallWheels();
 
 
-
   const singleBlockSieve = function (limit, subsegmentEnd, s) {
     if (typeof limit !== 'number' || typeof subsegmentEnd !== 'number' || typeof s !== 'number') {
       throw new TypeError();
@@ -821,11 +820,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const V = 64;
-    const S = 2**12 - V * 8;
+    const S = 2**12 - Math.floor(V * 5 / 2);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
       subsegmentEnd += S;
-      singleBlockSieve(V, subsegmentEnd, 0);
+      singleBlockSieve(smallWheels + V, subsegmentEnd, 0);
     }
     singleBlockSieve(Math.floor(wheelData.length / 3), segmentSize, segmentSize);
   };
