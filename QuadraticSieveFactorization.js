@@ -517,6 +517,21 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 // https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
 
+function packedDoubleArray(n) {
+  const array = [];
+  for (let i = 0; i < n; i += 1) {
+    array.push(-0);
+  }
+  return array.slice(0);
+}
+
+function packedIntArray(n) {
+  const array = [];
+  for (let i = 0; i < n; i += 1) {
+    array.push(0);
+  }
+  return array.slice(0);
+}
 
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (typeof N !== 'bigint') {
@@ -528,7 +543,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
     if (sieveSize1 > 2**21) {
-      sieveSize1 = Math.max(2**21, Math.floor(sieveSize1 / 4));
+      sieveSize1 = Math.max(2**21, Math.floor(sieveSize1 / 3));
     } else if (sieveSize1 > 2.75 * 2**17) {
       sieveSize1 = Math.max(2.75 * 2**17, Math.floor(sieveSize1 / 2));
     }
@@ -538,11 +553,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const q = Math.ceil(sieveSize1 / (2.75 * 2**17));
   const segmentSize = Math.ceil(Math.ceil(sieveSize1 / q) / 2) * 2;
   const sieveSize = segmentSize * q;
-  const SIEVE_SEGMENT1 = [];
-  for (let i = 0; i < segmentSize; i += 1) {
-    SIEVE_SEGMENT1.push(-0);
-  }
-  const SIEVE_SEGMENT = SIEVE_SEGMENT1.slice(0);
+  const SIEVE_SEGMENT = packedDoubleArray(segmentSize);
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
   const twoB = log2B + Math.min(8, log2B);
@@ -560,27 +571,37 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (p === 2) {
           const roots = squareRootsModuloTwo(nmodpInBeta, beta);
           for (let j = 0; j < Math.ceil(roots.length / 2); j += 1) {
-            wheels0.push({step: pInBeta, proot: 0, proot2: 0, p: p, root: roots[j] | 0});
+            wheels0.push({step: pInBeta, p: p, root: roots[j] | 0});
           }
         } else {
           const root = squareRootModuloOddPrime(nmodpInBeta, p, beta);
-          wheels0.push({step: pInBeta, proot: 0, proot2: 0, p: p, root: root | 0});
+          wheels0.push({step: pInBeta, p: p, root: root | 0});
         }
       }
     }
   }
   wheels0.sort((a, b) => +a.step - +b.step);
-  const wheels = [];
-  const wheelLogs = [];
-  const wheelRoots = [];
-  const wheelStepInvs = [];
+
+  const wheelLogs = packedDoubleArray(wheels0.length);
+  const wheelRoots = packedIntArray(wheels0.length);
+  const wheelStepInvs = packedDoubleArray(wheels0.length);
+  const wheelData = packedIntArray(wheels0.length * 3);
+
   for (let i = 0; i < wheels0.length; i += 1) {
     const w = wheels0[i];
-    wheels.push({step: w.step, proot: 0, proot2: 0});
-    wheelLogs.push(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1));
-    wheelRoots.push(w.root);
-    wheelStepInvs.push((1 + 2**-52) / w.step);
+    wheelData[i*3 + 0] = w.step | 0;
+    wheelData[i*3 + 1] = 0;
+    wheelData[i*3 + 2] = 0;
+    wheelLogs[i] = Math.log2(w.p) * (w.step === 2 ? 0.5 : 1);
+    wheelRoots[i] = w.root | 0;
+    wheelStepInvs[i] = (1 + 2**-52) / w.step;
   }
+
+  globalThis._arrays = {
+    SIEVE_SEGMENT: SIEVE_SEGMENT,
+    wheelLogs: wheelLogs,
+    wheelData: wheelData
+  };
 
   const lpStrategy = function (p, polynomial, x) {
     // https://ru.wikipedia.org/wiki/Алгоритм_Диксона#Стратегия_LP
@@ -614,25 +635,25 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (!useMultiplePolynomials) {
     const baseOffset = BigInt(sqrt(N)) + 1n;
     polynomial = new QuadraticPolynomial(1n, baseOffset, N, []);
-    baseOffsets = new Array(wheels.length).fill(0);
+    baseOffsets = packedIntArray(wheels0.length);
     // - Number(baseOffset % BigInt(pInBeta))
-    for (let i = 0; i < wheels.length; i += 1) {
-      baseOffsets[i] = Number(baseOffset % BigInt(wheels[i].step));
+    for (let i = 0; i < wheels0.length; i += 1) {
+      baseOffsets[i] = Number(baseOffset % BigInt(wheels0[i].step)) | 0;
     }
   }
 
   let invCacheKey = 0n;
-  const invCache = new Array(wheels.length).fill(0);
+  const invCache = packedIntArray(wheels0.length);
 
   function checkWheels(offset) {
-    for (let k = 0; k < wheels.length; k += 1) {
+    for (let k = 0; k < wheelData.length / 3; k += 1) {
       for (let v = 0; v <= 1; v += 1) {
-        const root = (v === 0 ? wheels[k].proot : wheels[k].proot2);
+        const root = (v === 0 ? wheelData[k * 3 + 1] : wheelData[k * 3 + 2]);
         if (root !== sieveSize) {
           const x = BigInt(+root + offset);
           const X = (polynomial.A * x + polynomial.B);
           const Y = X * X - N;
-          if (Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(wheels[k].step) !== 0n) {
+          if (Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(wheelData[k * 3]) !== 0n) {
             throw new Error();
           }
         }
@@ -647,32 +668,32 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
     const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
-    for (let i = 0; i < wheels.length; i += 1) {
-      const w = wheels[i];
-      const p = w.step | 0;
+    for (let i = 0; i + i + i < wheelData.length; i += 1) {
+      const iii = i + i + i;
+      const p = wheelData[iii] | 0;
       const root = wheelRoots[i] | 0;
       const sInv = +wheelStepInvs[i];
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
         const a = FastMod(AA, p);
-        invCache[i] = modInverseSmall(a, p);
+        invCache[i] = modInverseSmall(a, p) | 0;
       }
-      const invA = invCache[i];
+      const invA = invCache[i] | 0;
       //const b = Number(polynomial.B % BigInt(p));
       const b = +FastMod(BB, p);
       if (invA === 0) {
         // single root:
         // x = (2B)^-1*(-C) (mod p)
         // skip as the performance is not better
-        w.proot = sieveSize;
-        w.proot2 = sieveSize;
+        wheelData[iii + 1] = sieveSize;
+        wheelData[iii + 2] = sieveSize;
       } else {
         const x1 = (p - b + (p + root)) * invA - offset;
         const x2 = (p - b + (p - root)) * invA - offset;
         const r1 = (x1 - Math.floor(x1 * sInv) * p) | 0; // x1 mod p
         const r2 = (x2 - Math.floor(x2 * sInv) * p) | 0; // x2 mod p
-        w.proot = r2 + ((r1 - r2) & ((r1 - r2) >> 31));
-        w.proot2 = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
+        wheelData[iii + 1] = r2 + ((r1 - r2) & ((r1 - r2) >> 31));
+        wheelData[iii + 2] = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
       }
     }
     invCacheKey = polynomial.A;
@@ -693,8 +714,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const getSmallWheels = function () {
     let p = 1;
     let i = 0;
-    while (i < wheels.length && lcm(p, wheels[i].step) <= segmentSize / 5) {
-      p = lcm(p, wheels[i].step);
+    while (i < wheels0.length && lcm(p, wheels0[i].step) <= segmentSize / 5) {
+      p = lcm(p, wheels0[i].step);
       i += 1;
     }
     return i;
@@ -707,15 +728,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (typeof limit !== 'number' || typeof subsegmentEnd !== 'number' || typeof s !== 'number') {
       throw new TypeError();
     }
-    if (subsegmentEnd > SIEVE_SEGMENT.length || limit > wheels.length || limit > wheelLogs.length || smallWheels < 0) {
+    if (subsegmentEnd > SIEVE_SEGMENT.length || limit * 3 > wheelData.length || limit > wheelLogs.length || smallWheels < 0) {
       throw new RangeError();
     }
     for (let j = smallWheels; j < limit; j += 1) {
       const log2p = +wheelLogs[j];
-      const w = wheels[j];
-      const step = w.step | 0;
-      let kpplusr = w.proot | 0;
-      let kpplusr2 = w.proot2 | 0;
+      const jjj = j + j + j;
+      const step = wheelData[jjj] | 0;
+      let kpplusr = wheelData[jjj + 1] | 0;
+      let kpplusr2 = wheelData[jjj + 2] | 0;
       if (kpplusr > kpplusr2 || kpplusr < 0) {
         throw new RangeError();
       }
@@ -732,8 +753,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         kpplusr = kpplusr2;
         kpplusr2 = tmp;
       }
-      w.proot = kpplusr - s;
-      w.proot2 = kpplusr2 - s;
+      wheelData[jjj + 1] = kpplusr - s;
+      wheelData[jjj + 2] = kpplusr2 - s;
     }
   };
 
@@ -787,16 +808,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     let cycleLength = 1;
     SIEVE_SEGMENT[0] = -0;
     for (let j = 0; j < smallWheels; j += 1) {
-      const newCycleLength = +lcm(cycleLength, wheels[j].step);
+      const jjj = j + j + j;
+      const newCycleLength = +lcm(cycleLength, wheelData[jjj]);
       copyCycle(SIEVE_SEGMENT, cycleLength, newCycleLength);
       cycleLength = newCycleLength;
-      const w = wheels[j];
-      const step = w.step | 0;
+      const step = wheelData[jjj] | 0;
       const log2p = +wheelLogs[j];
-      for (let k = ((w.proot | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
+      for (let k = ((wheelData[jjj + 1] | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
-      for (let k = ((w.proot2 | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
+      for (let k = ((wheelData[jjj + 2] | 0) + newCycleLength - segmentStart % newCycleLength) % step; k < newCycleLength; k += step) {
         SIEVE_SEGMENT[k] += log2p;
       }
     }
@@ -812,7 +833,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       subsegmentEnd += S;
       singleBlockSieve(V, subsegmentEnd, 0);
     }
-    singleBlockSieve(wheels.length, segmentSize, segmentSize);
+    singleBlockSieve(Math.floor(wheelData.length / 3), segmentSize, segmentSize);
   };
 
   const smoothEntries = [];
@@ -847,18 +868,30 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   function checkFactorization(x) {
     let p = 0;
-    for (let n = 0; n < wheels.length; n += 1) {
-      const w = wheels[n];
+    for (let n = 0; n < wheelData.length / 3; n += 1) {
       for (let v = 0; v <= 1; v += 1) {
-        if ((x - (v === 0 ? (w.proot | 0) : (w.proot2 | 0)) - (n < smallWheels ? 0 : segmentSize)) % w.step === 0) {
-          if (polynomial.AFactors.indexOf(w.step) === -1) {
-            console.log(w.step);
+        const step = wheelData[n * 3];
+        if ((x - (v === 0 ? (wheelData[n * 3 + 1] | 0) : (wheelData[n * 3 + 2] | 0)) - (n < smallWheels ? 0 : segmentSize)) % step === 0) {
+          if (polynomial.AFactors.indexOf(step) === -1) {
+            console.log(step);
             p += +wheelLogs[n];
           }
         }
       }
     }
     return p;
+  }
+
+  function applyOffset(offset) {
+    for (let j = 0; j < wheelData.length / 3; j += 1) {
+      const step = wheelData[j * 3];
+      let r1 = (0 + (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
+      r1 += (r1 < 0 ? step : 0);
+      let r2 = (0 - (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
+      r2 += (r2 < 0 ? step : 0);
+      wheelData[j * 3 + 1] = Math.min(r1, r2);
+      wheelData[j * 3 + 2] = Math.max(r1, r2);
+    }
   }
 
   QuadraticSieveFactorization.lpCounter = 0;
@@ -878,16 +911,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             polynomial = polynomialGenerator.next();
             updateWheels(polynomial, offset);
           } else {
-            for (let j = 0; j < wheels.length; j += 1) {
-              const w = wheels[j];
-              const step = w.step;
-              let r1 = (0 + (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
-              r1 += (r1 < 0 ? step : 0);
-              let r2 = (0 - (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
-              r2 += (r2 < 0 ? step : 0);
-              w.proot = Math.min(r1, r2);
-              w.proot2 = Math.max(r1, r2);
-            }
+            applyOffset(offset);
           }
 
           smoothEntries.length = 0;
