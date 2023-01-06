@@ -556,7 +556,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SIEVE_SEGMENT = packedDoubleArray(segmentSize);
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const twoB = log2B + Math.min(8, log2B);
+  const twoB = log2B + Math.min(8.5, log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
