@@ -597,12 +597,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     wheelStepInvs[i] = (1 + 2**-52) / w.step;
   }
 
-  globalThis._arrays = {
-    SIEVE_SEGMENT: SIEVE_SEGMENT,
-    wheelLogs: wheelLogs,
-    wheelData: wheelData
-  };
-
   const lpStrategy = function (p, polynomial, x) {
     // https://ru.wikipedia.org/wiki/Алгоритм_Диксона#Стратегия_LP
     const lp = largePrimes.get(p);
