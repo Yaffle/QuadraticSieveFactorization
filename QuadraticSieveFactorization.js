@@ -584,7 +584,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const wheelLogs = packedDoubleArray(wheels0.length);
   const wheelRoots = packedIntArray(wheels0.length);
-  const wheelStepInvs = packedDoubleArray(wheels0.length);
   const wheelData = packedIntArray(wheels0.length * 3);
 
   for (let i = 0; i < wheels0.length; i += 1) {
@@ -594,7 +593,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     wheelData[i*3 + 2] = 0;
     wheelLogs[i] = Math.log2(w.p) * (w.step === 2 ? 0.5 : 1);
     wheelRoots[i] = w.root | 0;
-    wheelStepInvs[i] = (1 + 2**-52) / w.step;
   }
 
   const lpStrategy = function (p, polynomial, x) {
@@ -666,7 +664,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const iii = i + i + i;
       const p = wheelData[iii] | 0;
       const root = wheelRoots[i] | 0;
-      const sInv = +wheelStepInvs[i];
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
         const a = FastMod(AA, p);
@@ -674,6 +671,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       const invA = invCache[i] | 0;
       //const b = Number(polynomial.B % BigInt(p));
+      const pInv = (1 + 2**-52) / p;
       const b = +FastMod(BB, p);
       if (invA === 0) {
         // single root:
@@ -684,8 +682,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       } else {
         const x1 = (p - b + (p + root)) * invA - offset;
         const x2 = (p - b + (p - root)) * invA - offset;
-        const r1 = (x1 - Math.floor(x1 * sInv) * p) | 0; // x1 mod p
-        const r2 = (x2 - Math.floor(x2 * sInv) * p) | 0; // x2 mod p
+        const r1 = (x1 - Math.floor(x1 * pInv) * p) | 0; // x1 mod p
+        const r2 = (x2 - Math.floor(x2 * pInv) * p) | 0; // x2 mod p
         wheelData[iii + 1] = r2 + ((r1 - r2) & ((r1 - r2) >> 31));
         wheelData[iii + 2] = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
       }
