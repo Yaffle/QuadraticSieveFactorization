@@ -160,7 +160,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
     }
   }
   if (true) {
-    const r = sqrtMod(n, p);
+    const r = sqrtMod(n, p) | 0;
     return Math.min(r, p - r);
   }
   let rrmnmodp = 1 - n; // r**2 % p - n
@@ -726,7 +726,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     for (let j = smallWheels; j < limit; j += 1) {
       const log2p = +wheelLogs[j];
-      const wheel = (j + j + j);
+      const wheel = (0 + j + j + j);
       const step = wheelData[wheel] | 0;
       let kpplusr = wheelData[wheel + 1] | 0;
       let kpplusr2 = wheelData[wheel + 2] | 0;
