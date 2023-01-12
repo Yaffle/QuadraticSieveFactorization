@@ -30,4 +30,4 @@ See [demo](https://yaffle.github.io/QuadraticSieveFactorization/demo.html).
 
 # Performance
 
-It took almost -11 hours- 6.5 hours to factor [RSA-100](https://en.wikipedia.org/wiki/RSA_numbers#RSA-100) on Core i7-1165G7 .
+It took almost ~~11 hours~~ 6.5 hours to factor [RSA-100](https://en.wikipedia.org/wiki/RSA_numbers#RSA-100) on Core i7-1165G7 .
