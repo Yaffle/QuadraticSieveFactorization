@@ -63,6 +63,11 @@ BitSet.prototype.xor = function (other) {
     a[i + 3] ^= b[i + 3] | 0;
   }
 };
+BitSet.prototype.clear = function () {
+  for (let i = 0; i < this.data.length; i += 1) {
+    this.data[i] = 0;
+  }
+};
 BitSet.prototype.toString = function () {
   return this.data.map(x => (x >>> 0).toString(2).padStart(BitSetWordSize, '0').split('').reverse().join('')).join('').slice(0, this.size);
 };
@@ -300,8 +305,15 @@ function sparseSolve(columnsCount) {
     }
     const newColumnsCount = k;
 
-    newMatrix = M.map(function (row) {
-      const newRow = new BitSet(newColumnsCount);
+    const pool = [];
+    function getNewRow(row) {
+      let newRow = null;
+      if (pool.length > 0) {
+        newRow = pool.pop();
+        newRow.clear();
+      } else {
+        newRow = new BitSet(newColumnsCount);
+      }
       for (let j = 0; j < row.length; j++) {
         const e = newColumnIds[row[j]];
         if (e !== -1) {
@@ -309,18 +321,49 @@ function sparseSolve(columnsCount) {
         }
       }
       return newRow;
-    });
-    for (let i = 0; i < xors.length; i++) {
-      newMatrix[xors[i].a].xor(newMatrix[xors[i].b]);
     }
+    //newMatrix = M.map(row => getNewRow(row));
+
+    //trying to reduce the memory usage by new rows:
+    newMatrix = M.map(row => null);
+    const lastUsage = sparseMatrix.rows.map(row => (row != null ? 1/0 : -1));
+    for (let i = xors.length - 1; i >= 0; i -= 1) {
+      if (lastUsage[xors[i].a] !== -1) {
+        if (lastUsage[xors[i].b] === -1) {
+          lastUsage[xors[i].b] = i;
+        }
+      } else {
+        xors[i] = null;
+      }
+    }
+    const newRow = function (i, j) {
+      if (newMatrix[i] == null) {
+        console.assert(lastUsage[i] >= j);
+        newMatrix[i] = getNewRow(M[i]);
+      }
+      const result = newMatrix[i];
+      return result;
+    };
+
+    for (let i = 0; i < xors.length; i++) {
+      if (xors[i] != null) {
+        newRow(xors[i].a, i).xor(newRow(xors[i].b, i));
+        if (lastUsage[xors[i].b] <= i) {
+          pool.push(newMatrix[xors[i].b]);
+          newMatrix[xors[i].b] = null;
+        }
+      }
+    }
+
     for (let i = 0; i < sparseMatrix.rows.length; i++) {
       if (sparseMatrix.rows[i] != null) {
         console.assert(sparseMatrix.rows[i].length === 0);
+        newMatrix[i] = newRow(i, 1/0);
       } else {
         newMatrix[i] = null;
       }
     }
-    
+
     /*console.time('n1');
     const template = packedArray(newColumnsCount);
     newMatrix = newMatrix.map(function (row) {
@@ -339,7 +382,7 @@ function sparseSolve(columnsCount) {
     });
     console.timeEnd('n1');*/
 
-    //console.log('newMatrix', newMatrix.filter(x => x != null));
+    //console.log('newMatrix', newMatrix.filter(x => x != null).length);
 
     //const start = Date.now();
     solutions = solve(newColumnsCount, true); // find products of Y_k = Y, so that Y is a perfect square
@@ -376,7 +419,7 @@ function sparseSolve(columnsCount) {
               set[solution[i]] = 1;
             }
             for (let i = xors.length - 1; i >= 0; i--) {
-              if (set[xors[i].a] === 1) {
+              if (xors[i] != null && set[xors[i].a] === 1) {
                 set[xors[i].b] = 1 - set[xors[i].b];
               }
             }
