@@ -212,7 +212,7 @@ function getSmoothFactorization(a, base) {
   let isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
   while (i < base.length && isBig) {
     const p = base[i];
-    while (FastMod(fastValue, p) === 0) {
+    while (+FastMod(fastValue, p) === 0) {
       value /= BigInt(p);
       fastValue = FastModBigInt(value);
       isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
@@ -589,8 +589,8 @@ function AsmModule(stdlib, foreign, heap) {
 // TOWO: WebAssembly (~17% faster)
 function instantiate(memorySize) {
   const buffer = new ArrayBuffer(memorySize);
-  const singleBlockSieve = AsmModule(globalThis, null, buffer).singleBlockSieve;
-  return {singleBlockSieve: singleBlockSieve, memory: {buffer: buffer}};
+  const exports = AsmModule(globalThis, null, buffer);
+  return Object.assign({}, exports, {memory: {buffer: buffer}});
 }
 
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
@@ -643,7 +643,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   wheels0.sort((a, b) => +a.step - +b.step);
 
   const wheelRoots = packedIntArray(wheels0.length);
-  //const wheelData = packedIntArray(wheels0.length * 4);
 
   function nextValidHeapSize(size) {
     size = Math.max(size, 2**12);
@@ -770,7 +769,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const root = wheelRoots[i] | 0;
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
-        const a = FastMod(AA, p);
+        const a = +FastMod(AA, p);
         invCache[i] = modInverseSmall(a, p) | 0;
       }
       const invA = invCache[i] | 0;
@@ -788,8 +787,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const x2 = (p - b + (p - root)) * invA - offset;
         const r1 = (x1 - Math.floor(x1 * pInv) * p) | 0; // x1 mod p
         const r2 = (x2 - Math.floor(x2 * pInv) * p) | 0; // x2 mod p
-        wheelData[wheel + 2] = r2 + ((r1 - r2) & ((r1 - r2) >> 31));
-        wheelData[wheel + 3] = r1 - ((r1 - r2) & ((r1 - r2) >> 31));
+        wheelData[wheel + 2] = r2 + ((r1 - r2) & ((r1 - r2) >> 31)); // min(r1, r2)
+        wheelData[wheel + 3] = r1 - ((r1 - r2) & ((r1 - r2) >> 31)); // max(r1, r2)
       }
     }
     invCacheKey = polynomial.A;
@@ -879,7 +878,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      thresholdApproximation = Math.round((polynomial.log2AbsY(i + offset) - twoB) * SCALE);
+      thresholdApproximation = Math.round((polynomial.log2AbsY(i + offset) - twoB) * SCALE) | 0;
       const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation * (1 / SCALE) + twoB, sieveSize) - offset);
 
       while (i < j) {
