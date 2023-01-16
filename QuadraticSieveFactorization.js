@@ -609,8 +609,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
   //console.debug('sieveSize1', Math.log2(sieveSize1));
-
-  const q = Math.ceil(sieveSize1 / (2.75 * 2**18));
+  
+  const q = Math.ceil(sieveSize1 / (navigator.hardwareConcurrency === 12 ? 2.75 * 2**18 : 6 * 2**18));
+  console.debug('q', q);
   const segmentSize = Math.ceil(Math.ceil(sieveSize1 / q) / 4) * 4;
   const sieveSize = segmentSize * q;
   const SCALE = 2**22;//TODO:
@@ -863,8 +864,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //  SIEVE_SEGMENT[j] = 0;
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
-    const V = 64 * (wheelsCount > 2**18 ? 3 : 1);
-    const S = 2**13 - Math.floor(V * 4);
+    const m = (navigator.hardwareConcurrency === 12 ? 1 : 1.5);
+    const V = Math.floor(64 * m) * (wheelsCount > 2**18 ? 3 : 1);
+    const S = Math.floor(2**13 * m - V * 4);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
       subsegmentEnd += S;
