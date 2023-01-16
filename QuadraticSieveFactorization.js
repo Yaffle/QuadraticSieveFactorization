@@ -356,14 +356,14 @@ function FastMod(array, integer) {
   let result = array[n];
   const v = integer;
   const inv = (1 + 2**-52) / v;
-  result -= Math.floor(result * inv) * v;
+  result = result - Math.floor(result * inv) * v;
   if (n > 0) {
     const x = 2**51 - Math.floor(2**51 * inv) * v;
     let i = n;
     do {
       i -= 1;
       result = result * x + array[i];
-      result -= Math.floor(result * inv) * v;
+      result = result - Math.floor(result * inv) * v;
     } while (i !== 0);
   }
   return result;
@@ -783,12 +783,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         wheelData[wheel + 2] = sieveSize;
         wheelData[wheel + 3] = sieveSize;
       } else {
-        const x1 = (p - b + (p + root)) * invA - offset;
-        const x2 = (p - b + (p - root)) * invA - offset;
-        const r1 = (x1 - Math.floor(x1 * pInv) * p) | 0; // x1 mod p
-        const r2 = (x2 - Math.floor(x2 * pInv) * p) | 0; // x2 mod p
-        wheelData[wheel + 2] = r2 + ((r1 - r2) & ((r1 - r2) >> 31)); // min(r1, r2)
-        wheelData[wheel + 3] = r1 - ((r1 - r2) & ((r1 - r2) >> 31)); // max(r1, r2)
+        const e = p - b + p;
+        let x1 = (e + root) * invA - offset;
+        let x2 = (e - root) * invA - offset;
+        x1 = x1 - Math.floor(x1 * pInv) * p;
+        x2 = x2 - Math.floor(x2 * pInv) * p;
+        const r1 = x1 | 0; // x1 mod p
+        const r2 = x2 | 0; // x2 mod p
+        const s = ((r1 - r2) & ((r1 - r2) >> 31));
+        wheelData[wheel + 2] = r2 + s; // min(r1, r2)
+        wheelData[wheel + 3] = r1 - s; // max(r1, r2)
       }
     }
     invCacheKey = polynomial.A;
@@ -859,7 +863,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //  SIEVE_SEGMENT[j] = 0;
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
-    const V = 64;
+    const V = 64 * (wheelsCount > 2**18 ? 3 : 1);
     const S = 2**13 - Math.floor(V * 4);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
@@ -871,6 +875,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const smoothEntries = [];
   const smoothEntries2 = [];
+
+  function findSmoothEntry(thresholdApproximation, i) {
+    while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
+      i += 1;
+    }
+    return i;
+  }
+
   const findSmoothEntries = function (offset, polynomial) {
     let i = 0;
     let thresholdApproximation = 0;
@@ -885,9 +897,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (i < j - 1) {
           const tmp = SIEVE_SEGMENT[j - 1];
           SIEVE_SEGMENT[j - 1] = 1073741823;
-          while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
-            i += 1;
-          }
+          i = findSmoothEntry(thresholdApproximation, i)
           SIEVE_SEGMENT[j - 1] = tmp;
         }
         if (thresholdApproximation < SIEVE_SEGMENT[i]) {
