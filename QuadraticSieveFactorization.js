@@ -605,7 +605,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (sieveSize1 > 2**21) {
       sieveSize1 = Math.max(2**21, Math.floor(sieveSize1 / 3));
     } else if (sieveSize1 > 2.75 * 2**18) {
-      sieveSize1 = Math.max(2.75 * 2**18, Math.floor(sieveSize1 / 2));
+      sieveSize1 = Math.max(2.75 * 2**18, Math.floor(sieveSize1 / 3));
     }
   }
   //console.debug('sieveSize1', Math.log2(sieveSize1));
@@ -865,7 +865,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (navigator.hardwareConcurrency === 12 ? 1 : 1.5);
-    const V = Math.floor(64 * m) * (wheelsCount > 2**18 ? 3 : 1);
+    const V = Math.floor(64 * 1.5 * m * (wheelsCount > 2**18 ? 2 : 1));
     const S = Math.floor(2**13 * m - V * 4);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
@@ -879,8 +879,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const smoothEntries2 = [];
 
   function findSmoothEntry(thresholdApproximation, i) {
-    while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
-      i += 1;
+    while (thresholdApproximation >= SIEVE_SEGMENT[i] &&
+           thresholdApproximation >= SIEVE_SEGMENT[i + 1] &&
+           thresholdApproximation >= SIEVE_SEGMENT[i + 2] &&
+           thresholdApproximation >= SIEVE_SEGMENT[i + 3]) {
+      i += 4;
     }
     return i;
   }
@@ -896,10 +899,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, thresholdApproximation * (1 / SCALE) + twoB, sieveSize) - offset);
 
       while (i < j) {
-        if (i < j - 1) {
+        if (i < j - 1 && j + 3 < segmentSize) {
           const tmp = SIEVE_SEGMENT[j - 1];
           SIEVE_SEGMENT[j - 1] = 1073741823;
-          i = findSmoothEntry(thresholdApproximation, i)
+          i = findSmoothEntry(thresholdApproximation, i);
+          while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
+            i += 1;
+          }
           SIEVE_SEGMENT[j - 1] = tmp;
         }
         if (thresholdApproximation < SIEVE_SEGMENT[i]) {
