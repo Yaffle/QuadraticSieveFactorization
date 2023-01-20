@@ -2,6 +2,7 @@
 
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
+import wast2wasm from './wast2wasm.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
@@ -577,11 +578,106 @@ function AsmModule(stdlib, foreign, heap) {
     }
     return 0;
   }
-  return {singleBlockSieve: singleBlockSieve};
+  function findSmoothEntry(thresholdApproximation, i) {
+    thresholdApproximation = thresholdApproximation | 0;
+    i = i | 0;
+    while ((thresholdApproximation | 0) >= (SIEVE_SEGMENT[i << 2 >> 2] | 0)) {
+      i = (i + 1) | 0;
+    }
+    return i | 0;
+  }
+  return {singleBlockSieve: singleBlockSieve, findSmoothEntry: findSmoothEntry};
+}
+
+const wast = `
+(module
+ (type $type1 (func (param i32 i32 i32 i32) (result i32)))
+ (type $type2 (func (param i32 i32) (result i32)))
+ (import "env" "memory" (memory $0 0))
+ (export "singleBlockSieve" (func $singleBlockSieve))
+ (export "findSmoothEntry" (func $findSmoothEntry))
+ (func $singleBlockSieve (param $startWheel i32) (param $endWheel i32) (param $subsegmentEnd i32) (param $s i32) (result i32)
+  (local $step i32)
+  (local $log2p i32)
+  (local $kpplusr i32)
+  (local $kpplusr2 i32)
+  (local $k i32)
+  (local $k2 i32)
+  (local $tmp i32)
+  (local $j i32)
+  (local $wheel i32)
+  (local.set $j (local.get $startWheel))
+  (loop $wheels
+   (if (i32.lt_s (local.get $j) (local.get $endWheel))
+    (local.set $wheel (i32.shl (local.get $j) (i32.const 4)))
+    (local.set $kpplusr (i32.load offset=0 (local.get $wheel)))
+    (local.set $kpplusr2 (i32.load offset=4 (local.get $wheel)))
+    (local.set $log2p (i32.load offset=8 (local.get $wheel)))
+    (local.set $step (i32.load offset=12 (local.get $wheel)))
+     (loop $sieving
+      (if (i32.lt_s (local.get $kpplusr2) (local.get $subsegmentEnd))
+       (local.set $k (i32.shl (local.get $kpplusr) (i32.const 2)))
+       (i32.store (local.get $k) (i32.add (i32.load (local.get $k)) (local.get $log2p)))
+       (local.set $kpplusr (i32.add (local.get $kpplusr) (local.get $step)))
+       (local.set $k2 (i32.shl (local.get $kpplusr2) (i32.const 2)))
+       (i32.store (local.get $k2) (i32.add (i32.load (local.get $k2)) (local.get $log2p)))
+       (local.set $kpplusr2 (i32.add (local.get $kpplusr2) (local.get $step)))
+       (br $sieving)
+      )
+    )
+    (if (i32.lt_s (local.get $kpplusr) (local.get $subsegmentEnd))
+     (local.set $k (i32.shl (local.get $kpplusr) (i32.const 2)))
+     (i32.store (local.get $k) (i32.add (i32.load (local.get $k)) (local.get $log2p)))
+     (local.set $kpplusr (i32.add (local.get $kpplusr) (local.get $step)))
+     (local.set $tmp (local.get $kpplusr))
+     (local.set $kpplusr (local.get $kpplusr2))
+     (local.set $kpplusr2 (local.get $tmp))
+    )
+    (i32.store offset=0 (local.get $wheel) (i32.sub (local.get $kpplusr) (local.get $s)))
+    (i32.store offset=4 (local.get $wheel) (i32.sub (local.get $kpplusr2) (local.get $s)))
+    (local.set $j (i32.add (local.get $j) (i32.const 1)))
+    (br $wheels)
+   )
+  )
+  (return (i32.const 0))
+ )
+ (func $findSmoothEntry (param $thresholdApproximation i32) (param $i i32) (result i32)
+  (local $t v128)
+  (local.set $t (i32x4.splat (local.get $thresholdApproximation)))
+  (local.set $i (i32.shl (local.get $i) (i32.const 2)))
+  (loop $loop
+   (if (i32x4.all_true (i32x4.ge_s (local.get $t) (v128.load (local.get $i))))
+    (local.set $i (i32.add (local.get $i) (i32.const 16)))
+    (br $loop)
+   )
+  )
+  (local.set $i (i32.shr_s (local.get $i) (i32.const 2)))
+  (return (local.get $i))
+ )
+)
+`;
+
+let wasmModule = null;
+function instantiateWasm(memorySize) {
+  if (wasmModule == null) {
+    const code = wast2wasm(wast);
+    wasmModule = new WebAssembly.Module(code);
+  }
+  const pages = Math.ceil(memorySize / 2**16);
+  const memory = new WebAssembly.Memory({
+    initial: pages,
+    maximum: pages
+  });
+  const buffer = memory.buffer;
+  const exports = new WebAssembly.Instance(wasmModule, {env: { memory: memory }}).exports;
+  return Object.assign({}, exports, {memory: {buffer: buffer}});
 }
 
 // TOWO: WebAssembly (~17% faster)
 function instantiate(memorySize) {
+  if (globalThis.WebAssembly != null) {
+    return instantiateWasm(memorySize);
+  }
   const buffer = new ArrayBuffer(memorySize);
   const exports = AsmModule(globalThis, null, buffer);
   return Object.assign({}, exports, {memory: {buffer: buffer}});
@@ -650,6 +746,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const bufferSize = nextValidHeapSize((segmentSize + wheels0.length * 4) * 4);
   const exports = instantiate(bufferSize);
   const singleBlockSieve = exports.singleBlockSieve;
+  const findSmoothEntry = exports.findSmoothEntry;
   const arrayBuffer = exports.memory.buffer;
   const SIEVE_SEGMENT = new Int32Array(arrayBuffer);
   const wheelData = new Int32Array(arrayBuffer);
@@ -871,16 +968,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const smoothEntries = [];
   const smoothEntries2 = [];
-
-  function findSmoothEntry(thresholdApproximation, i) {
-    while (thresholdApproximation >= SIEVE_SEGMENT[i] &&
-           thresholdApproximation >= SIEVE_SEGMENT[i + 1] &&
-           thresholdApproximation >= SIEVE_SEGMENT[i + 2] &&
-           thresholdApproximation >= SIEVE_SEGMENT[i + 3]) {
-      i += 4;
-    }
-    return i;
-  }
 
   const findSmoothEntries = function (offset, polynomial) {
     let i = 0;

@@ -7,11 +7,54 @@
 
 <script type="module">
   import isPrime from './isPrime.js';
-  import factorize from './QuadraticSieveFactorization.js';
+  //import QuadraticSieveFactorization from './QuadraticSieveFactorization.js';
+
+const workerCode = `
+import QuadraticSieveFactorization from '<URL>';
+
+console.debug = function () {
+  self.postMessage({type: 'log', message: Array.from(arguments).join(' ')});
+};
+
+self.onmessage = function (event) {
+  self.postMessage({type: 'result', factor: QuadraticSieveFactorization(BigInt(event.data.N)).toString()});
+};
+
+self.onerror = function (message) {
+  console.log(message);
+};
+`;
+
+  let workers = [];
+  async function factorize(N) {
+    return new Promise((resolve, reject) => {
+      let worker = null;
+      if (workers.length === 0) {
+        worker = new Worker(URL.createObjectURL(new Blob([workerCode.replaceAll('<URL>', new URL('./QuadraticSieveFactorization.js', self.origin).toString())], {type: 'application/javascript'})), {type: 'module'});
+      } else {
+        worker = workers.pop();
+      }
+      worker.onmessage = function (event) {
+        const data = event.data;
+        if (data.type === 'result') {
+          workers.push(worker);
+          resolve(BigInt(data.factor));
+        } else if (data.type === 'log') {
+          const div = document.createElement('div');
+          div.innerHTML = data.message;
+          document.getElementById('log').appendChild(div);
+        }
+      };
+      worker.onerror = function (e) {
+        reject(e);
+      };
+      worker.postMessage({N: N.toString()});
+    });
+  };
   document.querySelector('form').onsubmit = function (event) {
     event.preventDefault();
     document.querySelector('#indicator').hidden = false;
-    window.setTimeout(function () {
+    window.setTimeout(async function () {
       const start = Date.now();
       const integer = eval(document.querySelector('input').value.replace(/(\d+)/g, '$1n'));
       const primeFactors = [];
@@ -27,7 +70,7 @@
             primeFactors.push(BigInt(a));
             a /= a;
           } else {
-            const f = BigInt(factorize(a));
+            const f = BigInt(await factorize(a));
             factors.push(f);
             if (a % f !== 0n) {
               throw new RangeError();
@@ -71,8 +114,13 @@ section > div {
   <option value="7293469445285646172092483905177589838606665884410340391954917800303813280275279" label="RSA-79"></option>
   <option value="1522605027922533360535618378132637429718068114961380688657908494580122963258952897654000350692006139" label="RSA-100"></option>
 </datalist>
-<div><form><label><div>Number to factorize:</div><input type="text" value="" list="samples" /></label><button>Go</button></form></div>
+<div><form><label><div>Number to factorize:</div><input type="text" value="" list="samples" style="width:113ch;max-width:90vw;" /></label><button>Go</button></form></div>
 <progress id="indicator" hidden></progress>
+<section>
+  <h2>Log:</h2>
+  <div id="log" style="overflow-anchor: auto">
+  </div>
+</section>
 <section id="result" hidden>
   <h2>Result:</h2>
   <div>
@@ -91,9 +139,6 @@ section > div {
 <div>
 <p>
 <a href="https://github.com/Yaffle/QuadraticSieveFactorization">source code</a>
-</p>
-<p>
-Open the browser console to see the computation progress.
 </p>
 </div>
 </body>
