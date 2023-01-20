@@ -185,75 +185,92 @@ function wast2wasm(sExpression) {
   const voidBlockType = 0x40;
 
   const labels = [];
-  function emitCode(node, vars) {
-    if (node[0] === 'local.get' || node[0] === 'local.set' || node[0] === 'local.tee') {
-      for (let i = 2; i < node.length; i++) {
-        emitCode(node[i], vars);
-      }
-      pushByte(opcode(node[0]));
-      const variableName = node[1];
-      const index = vars.indexOf(variableName);
-      pushByte(index);
-    } else if (node[0] === 'i32.const' || node[0] === 'i64.const' || node[0] === 'f64.const' || node[0] === 'f32.const') {
-      console.assert(node.length === 2);
-      pushByte(opcode(node[0]));
-      if ((Number(node[1]) & 0x7F).toString() !== node[1]) {
-        throw new RangeError('unsupported literal: ' + node[1]);
-      }
-      pushByte(Number(node[1]));
-    } else if (node[0] === 'loop' || node[0] === 'block') {
-      pushByte(opcode(node[0]));
-      pushByte(voidBlockType);
-      console.assert(node.length >= 2);
-      const label = typeof node[1] === "string" ? node[1] : null;
-      labels.push(label);
-      for (let i = (label != null ? 2 : 1); i < node.length; i++) {
-        emitCode(node[i], vars);
-      }
-      labels.pop();
-      pushByte(opcode('end'));
-    } else if (node[0] === 'br') {
-      console.assert(node.length === 2);
-      const label = node[1];
-      pushByte(opcode(node[0]));
-      pushByte(labels.length - 1 - labels.lastIndexOf(label));
-    } else if (node[0] === 'br_if') {
-      emitCode(node[2], vars);
-      console.assert(node.length === 3);
-      const label = node[1];
-      pushByte(opcode(node[0]));
-      pushByte(labels.length - 1 - labels.lastIndexOf(label));
-    } else if (node[0] === 'if') {
-      emitCode(node[1], vars);
-      pushByte(opcode(node[0]));
-      pushByte(voidBlockType);
-      labels.push(null);
-      //TODO: ELSE?
-      for (let i = 2; i < node.length; i++) {
-        emitCode(node[i], vars);
-      }
-      labels.pop();
-      pushByte(opcode('end'));
-    } else if (node[0].indexOf('.store') !== -1 || node[0].indexOf('.load') !== -1) {
-      const alignment = Math.round(Math.log2(Number(/\d+/.exec(node[0])[0]) / 8));
-      let offset = 0;
-      for (let i = 1; i < node.length; i++) {
-        if (typeof node[i] === 'string') {
-          const tmp = /^offset=(\d+)$/.exec(node[i]);
-          if (tmp == null) {
-            throw new TypeError();
-          }
-          offset = Number(tmp[1]);
-        } else {
-          emitCode(node[i], vars);
+  let vars = [];
+
+  function localInstr(node) {
+    if (node.length > 3) {
+      throw new TypeError();
+    }
+    const variableName = node[1];
+    const index = vars.indexOf(variableName);
+    if (node.length === 3) {
+      emitCode(node[2]);
+    }
+    pushByte(opcode(node[0]));
+    pushByte(index);
+  }
+
+  function constInstr(node) {
+    if (node.length !== 2) {
+      throw new TypeError();
+    }
+    if ((Number(node[1]) & 0x7F).toString() !== node[1]) {
+      throw new RangeError('unsupported literal: ' + node[1]);
+    }
+    pushByte(opcode(node[0]));
+    pushByte(Number(node[1]));
+  }
+
+  function blockInstr(node, withIf) {
+    const label = typeof node[withIf ? 2 : 1] === 'string' ? node[withIf ? 2 : 1] : null;
+    labels.push(label);
+    if (withIf) {
+      emitCode(node[1]);
+    }
+    pushByte(opcode(node[0]));
+    pushByte(voidBlockType);
+    for (let i = 1 + (label != null ? 1 : 0) + (withIf ? 1 : 0); i < node.length; i++) {
+      emitCode(node[i]);
+    }
+    pushByte(opcode('end'));
+    labels.pop();
+  }
+
+  function brInstr(node, withIf) {
+    if (node.length !== 2 + (withIf ? 1 : 0)) {
+      throw new TypeError();
+    }
+    const label = node[1];
+    if (withIf) {
+      emitCode(node[2]);
+    }
+    pushByte(opcode(node[0]));
+    pushByte(labels.length - 1 - labels.lastIndexOf(label));
+  }
+
+  function memoryInstr(node) {
+    const alignment = Math.round(Math.log2(Number(/\d+/.exec(node[0])[0]) / 8));
+    let offset = 0;
+    for (let i = 1; i < node.length; i++) {
+      if (typeof node[i] === 'string') {
+        const tmp = /^offset=(\d+)$/.exec(node[i]);
+        if (tmp == null) {
+          throw new TypeError();
         }
+        offset = Number(tmp[1]);
+      } else {
+        emitCode(node[i]);
       }
-      pushOpcode(opcode(node[0]));
-      pushByte(alignment);
-      pushByte(offset);
+    }
+    pushOpcode(opcode(node[0]));
+    pushByte(alignment);
+    pushByte(offset);
+  }
+
+  function emitCode(node) {
+    if (node[0].startsWith('local.')) {
+      localInstr(node);
+    } else if (node[0].endsWith('.const')) {
+      constInstr(node);
+    } else if (node[0] === 'loop' || node[0] === 'block' || node[0] === 'if') {
+      blockInstr(node, node[0] === 'if');
+    } else if (node[0] === 'br' || node[0] === 'br_if') {
+      brInstr(node, node[0] === 'br_if');
+    } else if (node[0].indexOf('.store') !== -1 || node[0].indexOf('.load') !== -1) {
+      memoryInstr(node);
     } else {
       for (let i = 1; i < node.length; i++) {
-        emitCode(node[i], vars);
+        emitCode(node[i]);
       }
       pushOpcode(opcode(node[0]));
     }
@@ -289,8 +306,9 @@ function wast2wasm(sExpression) {
             pushByte(0x01);
             pushByte(type(local.type));
           }
+          vars = params.concat(locals).map(x => x.name);
           for (const instr of instrs) {
-            emitCode(instr, params.concat(locals).map(x => x.name));
+            emitCode(instr);
           }
           pushByte(opcode('end'));
         });
@@ -304,7 +322,9 @@ function wast2wasm(sExpression) {
   const exports = [];
 
   const moduleNode = sExpressionToJSON(sExpression);
-  console.assert(moduleNode[0] === 'module');
+  if (moduleNode[0] !== 'module') {
+    throw new TypeError();
+  }
   for (let i = 1; i < moduleNode.length; i++) {
     const node = moduleNode[i];
     if (node[0] === 'type') {
