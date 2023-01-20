@@ -219,8 +219,20 @@ function wast2wasm(sExpression) {
     }
     pushByte(opcode(node[0]));
     pushByte(voidBlockType);
-    for (let i = 1 + (label != null ? 1 : 0) + (withIf ? 1 : 0); i < node.length; i++) {
-      emitCode(node[i]);
+    const s = 1 + (label != null ? 1 : 0) + (withIf ? 1 : 0);
+    if (withIf) {
+      if (node.length > s + 2) {
+        throw new TypeError();
+      }
+      emitCode(node[s]);
+      if (node.length === s + 2) {
+        pushByte(opcode('else'));
+        emitCode(node[s + 1]);
+      }
+    } else {
+      for (let i = s; i < node.length; i++) {
+        emitCode(node[i]);
+      }
     }
     pushByte(opcode('end'));
     labels.pop();
