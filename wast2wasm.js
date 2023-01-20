@@ -1,16 +1,12 @@
-
-function sExpressionToJSON(s) {
-  return JSON.parse(s.trim().replace(/\s+\)/g, ')')
-                            .replace(/\(\s+/g, '(')
-                            .replaceAll('(', '[')
-                            .replaceAll(')', ']')
-                            .replace(/([^\s\[\]]+)/g, s => '"' + s.replaceAll('"', '') + '"')
-                            .replace(/\s+/g, ','));
-}
+/*jshint esversion:6, bitwise:false*/
 
 // https://webassembly.github.io/wabt/demo/wat2wasm/index.html helps a lot
 
 function wast2wasm(sExpression) {
+
+  function sExpressionToJSON(s) {
+    return JSON.parse(s.trim().replace(/\s*\)/g, ']').replace(/\(\s*/g, '[').replace(/\s+/g, ',').replaceAll('"', '').replace(/([^\[\],]+)/g, '"$1"'));
+  }
 
   const bytes = [];
 
@@ -20,7 +16,7 @@ function wast2wasm(sExpression) {
     }
     bytes.push(byte);
   }
-  
+
   function pushUnsignedInteger(position, n) {
     do {
       const byte = (n & 0x7F) | ((n >>> 7) !== 0 ? 0x80 : 0x00);
@@ -38,14 +34,14 @@ function wast2wasm(sExpression) {
   }
 
   function pushString(s) {
-    console.assert(s.length < 0x80);
     pushByte(s.length);
-    for (var i = 0; i < s.length; i++) {
+    for (let i = 0; i < s.length; i++) {
       pushByte(s.charCodeAt(i));
     }
   }
+
   function pushOpcode(opcode) {
-    if (opcode <= 0xFF) {
+    if (opcode <= 0xF0) {
       bytes.push(opcode);
     } else {
       bytes.push((opcode >> 8));
@@ -58,11 +54,22 @@ function wast2wasm(sExpression) {
       pushByte(byte);
     }
   }
+
   function version() {
     for (const byte of [0x01, 0x00, 0x00, 0x00]) {
       pushByte(byte);
     }
   }
+
+  function emitTypes(node, expectedName) {
+    console.assert(node[0] === expectedName);
+    pushSize(function () {
+      for (let j = 1; j < node.length; j++) {
+        pushByte(type(node[j]));
+      }
+    });
+  }
+
   function typesec() {
     pushByte(0x01);
     pushSize(function () {
@@ -71,24 +78,15 @@ function wast2wasm(sExpression) {
         const node = typeNode[2];
         if (node[0] === 'func') {
           pushByte(0x60);
-          console.assert(node[1][0] === 'param');
-          pushSize(function () {
-            for (var j = 1; j < node[1].length; j++) {
-              pushByte(type(node[1][j]));
-            }
-          });
-          console.assert(node[2][0] === 'result');
-          pushSize(function () {
-            for (var j = 1; j < node[2].length; j++) {
-              pushByte(type(node[2][j]));
-            }
-          });
+          emitTypes(node[1], 'param');
+          emitTypes(node[2], 'result');
         } else {
           throw new TypeError();
         }
       }
     });
   }
+
   function importsec() {
     pushByte(0x02);
     pushSize(function () {
@@ -108,17 +106,17 @@ function wast2wasm(sExpression) {
       }
     });
   }
+
   function funcsec() {
     pushByte(0x03);
     pushSize(function () {
       pushByte(funcs.length);
-      let i = 0;
-      for (const func of funcs) {
+      for (let i = 0; i < funcs.length; i++) {
         pushByte(i);
-        i += 1;
       }
     });
   }
+
   function exportsec() {
     pushByte(0x07);
     pushSize(function () {
@@ -139,10 +137,15 @@ function wast2wasm(sExpression) {
       }
     });
   }
+
   const Types = {
     'i32': 0x7F,
+    'i64': 0x7E,
+    'f32': 0x7D,
+    'f64': 0x7C,
     'v128': 0x7B
   };
+
   function type(name) {
     const code = Types[name];
     if (code == undefined) {
@@ -150,31 +153,16 @@ function wast2wasm(sExpression) {
     }
     return code;
   }
-  
-  // from https://pengowray.github.io/wasm-ops/:
-  const start = 0x28;
-  const OpcodesList = 'i32.load i64.load f32.load f64.load i32.load8_s i32.load8_u i32.load16_s i32.load16_u i64.load8_s i64.load8_u i64.load16_s i64.load16_u i64.load32_s i64.load32_u i32.store i64.store f32.store f64.store i32.store8 i32.store16 i64.store8 i64.store16 i64.store32 ? ? i32.const i64.const f32.const f64.const i32.eqz i32.eq i32.ne i32.lt_s i32.lt_u i32.gt_s i32.gt_u i32.le_s i32.le_u i32.ge_s i32.ge_u i64.eqz i64.eq i64.ne i64.lt_s i64.lt_u i64.gt_s i64.gt_u i64.le_s i64.le_u i64.ge_s i64.ge_u f32.eq f32.ne f32.lt f32.gt f32.le f32.ge f64.eq f64.ne f64.lt f64.gt f64.le f64.ge i32.clz i32.ctz i32.popcnt i32.add i32.sub i32.mul i32.div_s i32.div_u i32.rem_s i32.rem_u i32.and i32.or i32.xor i32.shl i32.shr_s i32.shr_u i32.rotl i32.rotr i64.clz i64.ctz i64.popcnt i64.add i64.sub i64.mul i64.div_s i64.div_u i64.rem_s i64.rem_u i64.and i64.or i64.xor i64.shl i64.shr_s i64.shr_u i64.rotl i64.rotr f32.abs f32.neg f32.ceil f32.floor f32.trunc f32.nearest f32.sqrt f32.add f32.sub f32.mul f32.div f32.min f32.max f32.copysign f64.abs f64.neg f64.ceil f64.floor f64.trunc f64.nearest f64.sqrt f64.add f64.sub f64.mul f64.div f64.min f64.max f64.copysign i32.wrap_i64 i32.trunc_f32_s i32.trunc_f32_u i32.trunc_f64_s i32.trunc_f64_u i64.extend_i32_s i64.extend_i32_u i64.trunc_f32_s i64.trunc_f32_u i64.trunc_f64_s i64.trunc_f64_u f32.convert_i32_s f32.convert_i32_u f32.convert_i64_s f32.convert_i64_u f32.demote_f64 f64.convert_i32_s f64.convert_i32_u f64.convert_i64_s f64.convert_i64_u f64.promote_f32 i32.reinterpret_f32 i64.reinterpret_f64 f32.reinterpret_i32 f64.reinterpret_i64'.split(' ');
 
-  const Opcodes1 = {};
-  for (var i = 0; i < OpcodesList.length; i++) {
-    Opcodes1[OpcodesList[i]] = i + start;
+  // from https://pengowray.github.io/wasm-ops/:
+  const OpcodesList = 'unreachable nop block loop if else - - - - - end br br_if br_table return call call_indirect - - - - - - - - drop select - - - - local.get local.set local.tee global.get global.set - - - i32.load i64.load f32.load f64.load i32.load8_s i32.load8_u i32.load16_s i32.load16_u i64.load8_s i64.load8_u i64.load16_s i64.load16_u i64.load32_s i64.load32_u i32.store i64.store f32.store f64.store i32.store8 i32.store16 i64.store8 i64.store16 i64.store32 memory.size memory.grow i32.const i64.const f32.const f64.const i32.eqz i32.eq i32.ne i32.lt_s i32.lt_u i32.gt_s i32.gt_u i32.le_s i32.le_u i32.ge_s i32.ge_u i64.eqz i64.eq i64.ne i64.lt_s i64.lt_u i64.gt_s i64.gt_u i64.le_s i64.le_u i64.ge_s i64.ge_u f32.eq f32.ne f32.lt f32.gt f32.le f32.ge f64.eq f64.ne f64.lt f64.gt f64.le f64.ge i32.clz i32.ctz i32.popcnt i32.add i32.sub i32.mul i32.div_s i32.div_u i32.rem_s i32.rem_u i32.and i32.or i32.xor i32.shl i32.shr_s i32.shr_u i32.rotl i32.rotr i64.clz i64.ctz i64.popcnt i64.add i64.sub i64.mul i64.div_s i64.div_u i64.rem_s i64.rem_u i64.and i64.or i64.xor i64.shl i64.shr_s i64.shr_u i64.rotl i64.rotr f32.abs f32.neg f32.ceil f32.floor f32.trunc f32.nearest f32.sqrt f32.add f32.sub f32.mul f32.div f32.min f32.max f32.copysign f64.abs f64.neg f64.ceil f64.floor f64.trunc f64.nearest f64.sqrt f64.add f64.sub f64.mul f64.div f64.min f64.max f64.copysign i32.wrap_i64 i32.trunc_f32_s i32.trunc_f32_u i32.trunc_f64_s i32.trunc_f64_u i64.extend_i32_s i64.extend_i32_u i64.trunc_f32_s i64.trunc_f32_u i64.trunc_f64_s i64.trunc_f64_u f32.convert_i32_s f32.convert_i32_u f32.convert_i64_s f32.convert_i64_u f32.demote_f64 f64.convert_i32_s f64.convert_i32_u f64.convert_i64_s f64.convert_i64_u f64.promote_f32 i32.reinterpret_f32 i64.reinterpret_f64 f32.reinterpret_i32 f64.reinterpret_i64'.split(' ');
+
+  const Opcodes = {};
+  for (let i = 0; i < OpcodesList.length; i++) {
+    Opcodes[OpcodesList[i]] = i;
   }
 
-  const Opcodes = Object.assign({}, {
-    'unreachable': 0x00,
-    'nope': 0x01,
-    'block': 0x02,
-    'loop': 0x03,
-    'if': 0x04,
-    //'else': 
-    'end': 0x0B,
-    'br': 0x0C,
-    'br_if': 0x0D,
-    'return': 0x0F,
-    'local.get': 0x20,
-    'local.set': 0x21,
-    'local.tee': 0x22,
-
+  const SIMDOpcodes = {
     'i32x4.splat': 0xFD11,
     'i32x4.lt_s': 0xFD39,
     'i32x4.ge_s': 0xFD3F,
@@ -182,22 +170,24 @@ function wast2wasm(sExpression) {
     'v128.xor': 0xFD51,
     'v128.load': 0xFD00,
     'v128.store': 0xFD0B
-  }, Opcodes1);
+  };
+
+  const AllOpcodes = Object.assign({}, Opcodes, SIMDOpcodes);
 
   function opcode(name) {
-    const code = Opcodes[name];
+    const code = AllOpcodes[name];
     if (code == undefined) {
       throw new TypeError('unknown instruction: ' + name);
     }
     return code;
   }
-  
+
   const voidBlockType = 0x40;
 
   const labels = [];
   function emitCode(node, vars) {
     if (node[0] === 'local.get' || node[0] === 'local.set' || node[0] === 'local.tee') {
-      for (var i = 2; i < node.length; i++) {
+      for (let i = 2; i < node.length; i++) {
         emitCode(node[i], vars);
       }
       pushByte(opcode(node[0]));
@@ -217,7 +207,7 @@ function wast2wasm(sExpression) {
       console.assert(node.length >= 2);
       const label = typeof node[1] === "string" ? node[1] : null;
       labels.push(label);
-      for (var i = (label != null ? 2 : 1); i < node.length; i++) {
+      for (let i = (label != null ? 2 : 1); i < node.length; i++) {
         emitCode(node[i], vars);
       }
       labels.pop();
@@ -239,7 +229,7 @@ function wast2wasm(sExpression) {
       pushByte(voidBlockType);
       labels.push(null);
       //TODO: ELSE?
-      for (var i = 2; i < node.length; i++) {
+      for (let i = 2; i < node.length; i++) {
         emitCode(node[i], vars);
       }
       labels.pop();
@@ -247,7 +237,7 @@ function wast2wasm(sExpression) {
     } else if (node[0].indexOf('.store') !== -1 || node[0].indexOf('.load') !== -1) {
       const alignment = Math.round(Math.log2(Number(/\d+/.exec(node[0])[0]) / 8));
       let offset = 0;
-      for (var i = 1; i < node.length; i++) {
+      for (let i = 1; i < node.length; i++) {
         if (typeof node[i] === 'string') {
           const tmp = /^offset=(\d+)$/.exec(node[i]);
           if (tmp == null) {
@@ -262,12 +252,13 @@ function wast2wasm(sExpression) {
       pushByte(alignment);
       pushByte(offset);
     } else {
-      for (var i = 1; i < node.length; i++) {
+      for (let i = 1; i < node.length; i++) {
         emitCode(node[i], vars);
       }
       pushOpcode(opcode(node[0]));
     }
   }
+
   function codesec() {
     pushByte(0x0A);
     pushSize(function () {
@@ -281,7 +272,7 @@ function wast2wasm(sExpression) {
           const locals = [];
           const params = [];
           const instrs = [];
-          for (var i = 2; i < func.length; i++) {
+          for (let i = 2; i < func.length; i++) {
             if (func[i][0] === 'param') {
               params.push({name: func[i][1], type: func[i][2]});
             } else if (func[i][0] === 'result') {
@@ -314,7 +305,7 @@ function wast2wasm(sExpression) {
 
   const moduleNode = sExpressionToJSON(sExpression);
   console.assert(moduleNode[0] === 'module');
-  for (var i = 1; i < moduleNode.length; i++) {
+  for (let i = 1; i < moduleNode.length; i++) {
     const node = moduleNode[i];
     if (node[0] === 'type') {
       types.push(node);
