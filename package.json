@@ -1,6 +1,6 @@
 {
   "name": "quadraticsievefactorization",
-  "version": "1.0.58",
+  "version": "1.0.59",
   "description": "Quadratic Sieve integer factorization method for JavaScript bigints",
   "main": "QuadraticSieveFactorization.js",
   "scripts": {
@@ -26,6 +26,7 @@
     "isPrime.js",
     "solve.js",
     "sqrtMod.js",
+    "wast2wasm.js",
     "QuadraticSieveFactorization.js"
   ]
 }
