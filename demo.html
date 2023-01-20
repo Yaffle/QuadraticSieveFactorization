@@ -62,22 +62,28 @@ self.onerror = function (message) {
         primeFactors.push(-1n);
         integer = -integer;
       }
+      let errorMessage = '';
       const factors = [integer];
-      while (factors.length !== 0) {
-        let a = factors.pop();
-        while (a !== 1n) {
-          if (isPrime(a)) {
-            primeFactors.push(BigInt(a));
-            a /= a;
-          } else {
-            const f = BigInt(await factorize(a));
-            factors.push(f);
-            if (a % f !== 0n) {
-              throw new RangeError();
+      try {
+        while (factors.length !== 0) {
+          let a = factors.pop();
+          while (a !== 1n) {
+            if (isPrime(a)) {
+              primeFactors.push(BigInt(a));
+              a /= a;
+            } else {
+              const f = BigInt(await factorize(a));
+              factors.push(f);
+              if (a % f !== 0n) {
+                throw new RangeError();
+              }
+              a /= f;
             }
-            a /= f;
           }
         }
+      } catch (error) {
+        console.log(error);
+        errorMessage = 'Error: ' + error.toString();
       }
       primeFactors.sort((a, b) => Number(a - b));
       const group = function (factors) {
@@ -93,7 +99,7 @@ self.onerror = function (message) {
       };
       const end = Date.now();
       document.querySelector('#integer').innerHTML = integer;
-      document.querySelector('#factors').innerHTML = group(primeFactors).map(g => g.multiplicity === 1 ? g.prime : g.prime + '**' + g.multiplicity).map(f => '<li>' + f + '</li>').join('\n');
+      document.querySelector('#factors').innerHTML = errorMessage !== '' ? errorMessage : group(primeFactors).map(g => g.multiplicity === 1 ? g.prime : g.prime + '**' + g.multiplicity).map(f => '<li>' + f + '</li>').join('\n');
       document.querySelector('#time').innerHTML = (end - start) + 'ms';
       document.querySelector('#indicator').hidden = true;
       document.querySelector('#result').hidden = false;
