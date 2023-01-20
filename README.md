@@ -13,7 +13,7 @@ import factorize from './QuadraticSieveFactorization.js';
 console.time();
 const f = factorize(2n**128n + 1n);
 console.timeEnd();
-// ~110ms
+// ~50ms
 console.assert(f === 5704689200685129054721n || f === 59649589127497217n, f);
 ```
 
