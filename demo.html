@@ -30,7 +30,7 @@ self.onerror = function (message) {
     return new Promise((resolve, reject) => {
       let worker = null;
       if (workers.length === 0) {
-        worker = new Worker(URL.createObjectURL(new Blob([workerCode.replaceAll('<URL>', new URL('./QuadraticSieveFactorization.js', self.origin).toString())], {type: 'application/javascript'})), {type: 'module'});
+        worker = new Worker(URL.createObjectURL(new Blob([workerCode.replaceAll('<URL>', new URL('./QuadraticSieveFactorization.js', self.location.href).toString())], {type: 'application/javascript'})), {type: 'module'});
       } else {
         worker = workers.pop();
       }
