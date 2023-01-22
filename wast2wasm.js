@@ -163,10 +163,15 @@ function wast2wasm(sExpression) {
   }
 
   const SIMDOpcodes = {
+    'i8x16.splat': 0xFD0F,
+    'i8x16.ge_u': 0xFD2C,
+    'i8x16.all_true': 0xFD63,
+
     'i32x4.splat': 0xFD11,
     'i32x4.lt_s': 0xFD39,
     'i32x4.ge_s': 0xFD3F,
     'i32x4.all_true': 0xFDA3,
+
     'v128.xor': 0xFD51,
     'v128.load': 0xFD00,
     'v128.store': 0xFD0B
@@ -251,7 +256,11 @@ function wast2wasm(sExpression) {
   }
 
   function memoryInstr(node) {
-    const alignment = Math.round(Math.log2(Number(/\d+/.exec(node[0])[0]) / 8));
+    const tmp1 = /^[ifv](32|64|128)\.(?:store|load)(8|16|32|64|)(?:_u|_s)?$/.exec(node[0])
+    if (tmp1 == null) {
+      throw new TypeError(node[0]);
+    }
+    const alignment = Math.round(Math.log2(Number(tmp1[2] || tmp1[1]) / 8));
     let offset = 0;
     for (let i = 1; i < node.length; i++) {
       if (typeof node[i] === 'string') {
