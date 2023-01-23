@@ -652,7 +652,7 @@ const wast = `
   (local.set $t (i32x4.splat (local.get $thresholdApproximation)))
   (local.set $i (i32.shl (local.get $i) (i32.const 2)))
   (loop $loop
-   (if (i32x4.all_true (i32x4.ge_s (local.get $t) (v128.load (local.get $i))))
+   (if (i32.eqz (v128.any_true (i32x4.gt_s (v128.load (local.get $i)) (local.get $t))))
     (block
      (local.set $i (i32.add (local.get $i) (i32.const 16)))
      (br $loop)
@@ -664,6 +664,7 @@ const wast = `
  )
 )
 `;
+
 
 let wasmModule = null;
 function instantiateWasm(memorySize) {
