@@ -170,7 +170,9 @@ function wast2wasm(sExpression) {
     'i32x4.splat': 0xFD11,
     'i32x4.lt_s': 0xFD39,
     'i32x4.ge_s': 0xFD3F,
+    'i32x4.gt_s': 0xFD3B,
     'i32x4.all_true': 0xFDA3,
+    'v128.any_true': 0xFD53,
 
     'v128.xor': 0xFD51,
     'v128.load': 0xFD00,
