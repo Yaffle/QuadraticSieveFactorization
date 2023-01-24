@@ -173,6 +173,8 @@ function wast2wasm(sExpression) {
     'i32x4.gt_s': 0xFD3B,
     'i32x4.all_true': 0xFDA3,
     'v128.any_true': 0xFD53,
+    'i8x16.gt_s': 0xFD27,
+    'i8x16.gt_u': 0xFD28,
 
     'v128.xor': 0xFD51,
     'v128.load': 0xFD00,
