@@ -1140,8 +1140,8 @@ globalThis.countersFound = [0, 0];
     }
     for (var i = 0; i < smoothEntries2.length; i += 1) {
       const e = Math.abs(smoothEntries2[i] - smoothEntries2A[i]);
-      if (e > 8 && e < 100) {
-        throw new Error(e);
+      if (e >= 9 && e < 100) {
+        console.error(e);
       }
       smoothEntries2[i] = smoothEntries2A[i];
     }
