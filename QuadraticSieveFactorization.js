@@ -610,7 +610,9 @@ function AsmModule(stdlib, foreign, heap) {
   return {singleBlockSieve: singleBlockSieve, findSmoothEntry: findSmoothEntry};
 }
 
-const wast = `
+const wast = (strings) => String.raw({ raw: strings });
+
+const wastCode = wast`
 (module
  (type $type1 (func (param i32 i32 i32 i32 i32) (result i32)))
  (type $type2 (func (param i32 i32) (result i32)))
@@ -683,7 +685,7 @@ const wast = `
 let wasmModule = null;
 function instantiateWasm(memorySize) {
   if (wasmModule == null) {
-    const code = wast2wasm(wast);
+    const code = wast2wasm(wastCode);
     wasmModule = new WebAssembly.Module(code);
   }
   const pages = Math.ceil(memorySize / 2**16);
@@ -781,7 +783,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const w = wheels0[i];
     const wheel = wheelDataOffset + (i * 3);
     const log = Math.round(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1) * SCALE) | 0;
-    const gap = w.step - previous;
+    const gap = (w.step | 0) - previous;
     if (gap >= 2**14 || log >= 2**14) {
       throw new RangeError();
     }
@@ -967,7 +969,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (navigator.hardwareConcurrency === 12 ? 1 : 1.5);
-    const V = Math.min(wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**18 ? 2 : 1)));
+    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**18 ? 2 : 1)));
     const S = Math.floor(2**15 * m - V * 4);
     let subsegmentEnd = 0;
     console.assert(wheelDataOffset % 3 === 0);
@@ -983,6 +985,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const smoothEntries3 = [];
 
   const findSmoothEntries = function (offset, polynomial) {
+    if (typeof offset !== "number") {
+      throw new TypeError();
+    }
     let i = 0;
     let thresholdApproximation = 0;
     while (i < segmentSize) {
@@ -1047,13 +1052,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const set = new Uint8Array((sieveSize >> (3 + 3)) + 1);
 //globalThis.countersFound = [0, 0];
   const findPreciseSmoothEntries = function (offset) {
+    if (typeof offset !== "number") {
+      throw new TypeError();
+    }
     const smoothEntriesX = [];
-    for (let i = 0; i < smoothEntries.length; i++) {
+    for (let i = 0; i < smoothEntries.length; i += 1) {
       smoothEntriesX.push(-0 + (smoothEntries[i] - offset));
     }
     
     const smoothEntries2A = [];
-    for (let i = 0; i < smoothEntriesX.length; i++) {
+    for (let i = 0; i < smoothEntriesX.length; i += 1) {
       smoothEntries2A.push(-0);
     }
     for (let i = 0; i < set.length; i += 1) {
@@ -1091,11 +1099,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const e = smoothEntriesX[i];
         const x = e - Math.floor(e * stepInv) * step1;
         if (x === a) {
-          smoothEntries2A[i] += wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs[j];
           smoothEntries3[i].push(step);
         }
         if (x === b) {
-          smoothEntries2A[i] += wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs[j];
           smoothEntries3[i].push(step);
         }
       }
@@ -1103,9 +1111,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const f = function (a, j, step) {
       const ah = a >> 3;
       if ((set[ah >> 3] & (1 << (ah & 7))) !== 0) {
-        const i = indexOf(smoothEntries, a + offset);
+        const i = indexOf(smoothEntries, 0 + a + offset);
         if (i !== -1) {
-          smoothEntries2A[i] += wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs[j];
           smoothEntries3[i].push(step);
         }
       }
@@ -1154,7 +1162,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         }
       }
     }
-    for (var i = 0; i < smoothEntries2.length; i += 1) {
+    for (let i = 0; i < smoothEntries2.length; i += 1) {
       const e = Math.abs(smoothEntries2[i] - smoothEntries2A[i]);
       if (e >= 9 && e < 100) {
         console.error(e);
