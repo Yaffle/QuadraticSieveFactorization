@@ -213,7 +213,8 @@ function wast2wasm(sExpression) {
     if (node.length !== 2) {
       throw new TypeError();
     }
-    if ((Number(node[1]) & 0x7F).toString() !== node[1]) {
+    //! 0 <= c <= 63
+    if ((Number(node[1]) & 0x3F).toString() !== node[1]) {
       throw new RangeError('unsupported literal: ' + node[1]);
     }
     pushByte(opcode(node[0]));
@@ -282,6 +283,19 @@ function wast2wasm(sExpression) {
     pushByte(offset);
   }
 
+  function callInstr(node) {
+    if (node.length < 2) {
+      throw new TypeError();
+    }
+    const functionName = node[1];
+    const index = funcs.findIndex(func => func[1] === functionName);
+    for (let i = 2; i < node.length; i++) {
+      emitCode(node[i]);
+    }
+    pushByte(opcode(node[0]));
+    pushByte(index);
+  }
+
   function emitCode(node) {
     if (node[0].startsWith('local.')) {
       localInstr(node);
@@ -293,6 +307,8 @@ function wast2wasm(sExpression) {
       brInstr(node, node[0] === 'br_if');
     } else if (node[0].indexOf('.store') !== -1 || node[0].indexOf('.load') !== -1) {
       memoryInstr(node);
+    } else if (node[0] === 'call') {
+      callInstr(node);
     } else {
       for (let i = 1; i < node.length; i++) {
         emitCode(node[i]);
