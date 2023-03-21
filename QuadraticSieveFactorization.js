@@ -1118,7 +1118,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         }
       }
     };
-    console.assert(sieveSize >= wheels0.at(-1).step);
+    console.assert(wheels0.length > 0 && sieveSize >= wheels0[wheels0.length - 1].step);
     for (let j = A; j < wheelsCount; j += 1) {
       const wheel = (wheelDataOffset + (((j << 1) + j) | 0)) | 0;
       const proot1 = wheelData[wheel] | 0;
