@@ -701,7 +701,11 @@ function instantiateWasm(memorySize) {
 // TOWO: WebAssembly (~17% faster)
 function instantiate(memorySize) {
   if (true && globalThis.WebAssembly != null) {
-    return instantiateWasm(memorySize);
+    try {
+      return instantiateWasm(memorySize);
+    } catch (error) {
+      console.error(error);
+    }
   }
   const buffer = new ArrayBuffer(memorySize);
   const exports = AsmModule(globalThis, null, buffer);
