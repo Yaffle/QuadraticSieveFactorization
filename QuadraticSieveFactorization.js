@@ -99,7 +99,7 @@ function squareRootsModuloTwo(n, e = 1) {
       const m = Math.pow(2, e);
       const candidate = +squareRootsModuloTwo(n, e - 1)[0];
       const candidate2 = m / 4 - candidate;
-      const r = (candidate * candidate) % m !== n ? candidate2 : candidate;
+      const r = (candidate * candidate) % m !== n % m ? candidate2 : candidate;
       return [r, m / 2 - r, m / 2 + r, m - r];
     }
     return [];
@@ -1025,13 +1025,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     let p = 0;
     let step = 0;
     for (let n = 0; n < wheelsCount; n += 1) {
+      const wheel = wheelDataOffset + (n * 3);
+      const log2p = wheelData[wheel + 2] & 0xFFFF;
+      step += (wheelData[wheel + 2] >> 16);
       for (let v = 0; v <= 1; v += 1) {
-        const wheel = wheelDataOffset + (n * 3);
-        step += wheelData[wheel + 2] & 0xFF;
         if ((x - (v === 0 ? (wheelData[wheel] | 0) : (wheelData[wheel + 1] | 0)) - (n < smallWheels ? 0 : segmentSize)) % step === 0) {
           if (polynomial.AFactors.indexOf(step) === -1) {
             console.log(step);
-            p += (wheelData[wheel + 2] >> 16);
+            p += log2p;
           }
         }
       }
