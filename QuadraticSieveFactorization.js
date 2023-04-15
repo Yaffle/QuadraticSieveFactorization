@@ -121,10 +121,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
     throw new TypeError();
   }
   const m = Math.pow(p, e);
-  if (!(n > 0 && n < m && p > 0 && e >= 1 && +n % +p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
-    throw new RangeError();
-  }
-  if (p % 2 === 0) {
+  if (!(n > 0 && n < m && p > 0 && p % 2 !== 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
     throw new RangeError();
   }
   // r**2 == n (mod p)
@@ -145,37 +142,10 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
     if (x1 < 0) {
       x1 += m;
     }
-    if (x1 > m - x1) {
-      x1 = m - x1;
-    }
-    return x1;
+    return Math.min(x1, m - x1);
   }
-  if ((p + 1) % 4 === 0) {
-    // from https://en.wikipedia.org/wiki/Quadratic_residue#Prime_or_prime_power_modulus :
-    let r = modPowSmall(n, (p + 1) / 4, p);
-    if ((r * r) % p === n) {
-      if (r > p - r) {
-        r = p - r;
-      }
-      return r;
-    }
-  }
-  if (true) {
-    const r = sqrtMod(n, p) | 0;
-    return Math.min(r, p - r);
-  }
-  let rrmnmodp = 1 - n; // r**2 % p - n
-  for (let tworm1 = -1; true; tworm1 += 2) {
-    rrmnmodp += tworm1;
-    if (rrmnmodp >= p) {
-      rrmnmodp -= p;
-    }
-    if (rrmnmodp === 0) {
-      const r = Math.floor((tworm1 + 1) / 2);
-      return r;
-    }
-  }
-  throw new RangeError();
+  const r = sqrtMod(n, p) | 0;
+  return Math.min(r, p - r);
 }
 
 function bitLength(x) {
@@ -219,53 +189,6 @@ function getSmoothFactorization(a, base) {
   return value === 1n ? result : null;
 }
 
-//TODO: REMOVE(?)
-function getSmoothFactorizationOld(a, base) {
-  let value = BigInt(a);
-  if (value === 0n) {
-    return [0];
-  }
-  const result = [];
-  if (value < 0n) {
-    result.push(-1);
-    value = -value;
-  }
-  let i = 0;
-
-  let fastValue = FastModBigInt(value);
-  let isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
-  while (i < base.length && isBig) {
-    const p = base[i];
-    while (+FastMod(fastValue, p) === 0) {
-      value /= BigInt(p);
-      fastValue = FastModBigInt(value);
-      isBig = value > BigInt(Number.MAX_SAFE_INTEGER);
-      result.push(p);
-    }
-    i += 1;
-  }
-
-  let n = Number(value);
-  while (i < base.length) {
-    const p = +base[i];
-    while (n - Math.floor(n / p) * p === 0) {
-      n /= p;
-      result.push(p);
-    }
-    if (n !== 1 && n < p * p) {
-      // n should be prime (?)
-      const index = indexOf(base, n);
-      if (index === -1) {
-        return null;
-      }
-      result.push(n);
-      return result;
-    }
-    i += 1;
-  }
-  return n === 1 ? result : null;
-}
-
 // (X**2 - Y) % N === 0, where Y is a smooth number
 function CongruenceOfsquareOfXminusYmoduloN(X, Y, N) {
   this.X = X;
@@ -291,10 +214,7 @@ function isQuadraticResidueModuloPrime(a, p) {
   if (amodp === 0) {
     return true;
   }
-  console.assert(p % 2 === 1);
-  const value = modPowSmall(amodp, (p - 1) / 2, p);
-  console.assert(value === 1 || value === p - 1);
-  return value === 1;
+  return legendre(amodp, p) === 1;
 }
 
 function log(N) {
@@ -306,26 +226,6 @@ function log(N) {
 function L(N) {  // exp(sqrt(log(n)*log(log(n))))
   const lnn = log(N);
   return Math.exp(Math.sqrt(lnn * Math.log(lnn)));
-}
-
-function modPowSmall(base, exponent, modulus) {
-  if (typeof base !== 'number' || typeof exponent !== 'number' || typeof modulus !== 'number') {
-    throw new TypeError();
-  }
-  if (Math.max(Math.pow(modulus, 2), Math.pow(base, 2)) > Number.MAX_SAFE_INTEGER) {
-    throw new RangeError();
-  }
-  let accumulator = 1;
-  while (exponent !== 0) {
-    if (exponent % 2 === 0) {
-      exponent /= 2;
-      base = (+base * +base) % modulus;
-    } else {
-      exponent -= 1;
-      accumulator = (accumulator * base) % modulus;
-    }
-  }
-  return accumulator;
 }
 
 function modPow(base, exponent, modulus) {
@@ -573,8 +473,6 @@ function AsmModule(stdlib, foreign, heap) {
     var kpplusr2 = 0;
     var tmp = 0;
     var wheel = 0;
-    var k = 0;
-    var k2 = 0;
     step = p;
     for (wheel = startWheelData; (wheel | 0) < (endWheelData | 0); wheel = ((wheel + 12) | 0)) {
       kpplusr = wheelData[(wheel) >> 2] | 0;
