@@ -744,6 +744,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const nmodpInBeta = Number(N % BigInt(pInBeta));
       if (nmodpInBeta % p === 0) {
         //console.warn('N has a factor in prime base', N, p);
+        if (beta === 1) {
+          wheels0.push({step: pInBeta, p: p, root: 0});
+        }
       } else {
         if (p === 2) {
           const roots = squareRootsModuloTwo(nmodpInBeta, beta);
@@ -786,7 +789,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   for (let i = 0; i < wheelsCount; i += 1) {
     const w = wheels0[i];
     const wheel = wheelDataOffset + (i * 3);
-    const log = Math.round(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1) * SCALE) | 0;
+    const wheelLog = Math.log2(w.p) * (w.step === 2 || w.root === 0 ? 0.5 : 1);
+    const log = Math.round(wheelLog * SCALE) | 0;
     const gap = (w.step | 0) - previous;
     if (gap >= 2**14 || log >= 2**14) {
       throw new RangeError();
@@ -798,7 +802,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     wheelData[wheel + 2] = log | (gap << 16);
     wheelRoots[i] = -0 + w.root;
 
-    wheelLogs.push(Math.log2(w.p) * (w.step === 2 ? 0.5 : 1));
+    wheelLogs.push(wheelLog);
   }
 
   const lpStrategy = function (p, polynomial, x, pb) {
@@ -1311,19 +1315,92 @@ function computeY(primeBase, solution, N) {
   return y;
 }
 
+
+// a/n is represented as (a,n)
+function legendre(a, n) {
+    a = a | 0;
+    n = n | 0;
+    //console.assert(n > 0 && n%2 == 1);
+    //step 1
+    a = a % n;
+    var t = 1;
+    var r = 0;
+    //step 3
+    while (a !== 0) {
+        //step 2
+        while ((a & 1) === 0) {
+            a >>= 1;
+            r = n & 7;
+            if (r === 3 || r === 5) {
+                t = -t;
+            }
+        }
+        //step 4
+        r = n;
+        n = a;
+        a = r;
+        if ((a & 3) === 3 && (n & 3) === 3) {
+            t = -t;
+        }
+        a = a % n;
+    }
+    return n === 1 ? t : 0;
+}
+
+function getBestMultiplier(n, primesList) {
+  // https://ir.cwi.nl/pub/27839/27839.pdf
+
+  // f (m, n) = --2 - + L g(p, mn) logp,
+  const scores = new Array(101).fill(0);
+  for (let m = 1; m < scores.length; m += 1) {
+    scores[m] = -Math.log(m) / 2;
+  }
+
+  for (let i = 0; i < primesList.length && i < 300; i += 1) {
+    const p = primesList[i];
+    if (p === 2) {
+      for (let m = 1; m < scores.length; m += 1) {
+        scores[m] += [0, 2, 0, 0.5, 0, 1, 0, 0.5][(m * Number(n % 8n)) % 8] * Math.log(2);
+      }
+    } else {
+      const lnp = legendre(Number(n % BigInt(p)), p);
+      const cp = 2 / (p - 1) * Math.log(p);
+      for (let m = 1; m < scores.length; m += 1) {
+        scores[m] += (lnp * legendre(m, p) === 1 ? cp : 0);
+      }
+    }
+  }
+
+  let max = 0;
+  let best = 1;
+  for (let m = 1; m <= scores.length; m += 1) {
+    var y = scores[m];
+    if (y > max) {
+      max = y;
+      best = m;
+    }
+  }
+
+  //8.9848939430165
+  //console.log('best: ', best, 'scores: ', scores);
+  return best;
+}
+
 function QuadraticSieveFactorization(N) { // N - is not a prime
   if (typeof N !== 'bigint') {
     throw new TypeError();
   }
-  for (let k = 1n;; k += 1n) {
+  // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
+  // to limit memory usage during "solve" to 2GB:
+  const limit = Math.min(Math.floor(typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 2**23.5 : 2**23.75), (1 << 25) - 1);
+  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**160 ? 8 : 6))), limit), 1024);
+  const primesList = primes(B);
+  let k = 1n;
+  k = Number(N) > 2**64 ? BigInt(getBestMultiplier(N, primesList)) : 1n;
+  for (;; k += 1n) {
     const kN = k * N;
-    // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
 
-    // to limit memory usage during "solve" to 2GB:
-    const limit = Math.min(Math.floor(typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 2**23.5 : 2**23.75), (1 << 25) - 1);
-    const B = Math.max(Math.min(Math.floor(Math.sqrt(L(kN) / (Number(N) > 2**160 ? 8 : 6))), limit), 1024);
-
-    const primeBase = primes(B).filter(p => isQuadraticResidueModuloPrime(kN, p));
+    const primeBase = primesList.filter(p => isQuadraticResidueModuloPrime(kN, p));
     for (let i = 0; i < primeBase.length; i += 1) {
       if (Number(N % BigInt(primeBase[i])) === 0) {
         return BigInt(primeBase[i]);
