@@ -121,7 +121,7 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
     throw new TypeError();
   }
   const m = Math.pow(p, e);
-  if (!(n > 0 && n < m && p > 0 && p % 2 !== 0 && e >= 1 && n % p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
+  if (!(n > 0 && n < m && p > 0 && p % 2 !== 0 && e >= 1 && +n % +p !== 0 && m < Math.floor(Math.sqrt(Number.MAX_SAFE_INTEGER * 4)))) { // + p is a prime number
     throw new RangeError();
   }
   // r**2 == n (mod p)
@@ -1216,6 +1216,10 @@ function computeY(primeBase, solution, N) {
 
 // a/n is represented as (a,n)
 function legendre(a, n) {
+    if (typeof a !== 'number' || typeof b !== 'number') {
+      throw new TypeError();
+    }
+    // from https://en.wikipedia.org/wiki/Jacobi_symbol#Implementation_in_C++ :
     a = a | 0;
     n = n | 0;
     //console.assert(n > 0 && n%2 == 1);
@@ -1272,7 +1276,7 @@ function getBestMultiplier(n, primesList) {
   let max = 0;
   let best = 1;
   for (let m = 1; m <= scores.length; m += 1) {
-    var y = scores[m];
+    var y = +scores[m];
     if (y > max) {
       max = y;
       best = m;
