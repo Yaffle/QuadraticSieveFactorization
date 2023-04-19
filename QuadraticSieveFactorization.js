@@ -1224,7 +1224,7 @@ function legendre(a, n) {
     n = n | 0;
     //console.assert(n > 0 && n%2 == 1);
     //step 1
-    a = a % n;
+    a = (a | 0) % (n | 0);
     var t = 1;
     var r = 0;
     //step 3
@@ -1244,7 +1244,7 @@ function legendre(a, n) {
         if ((a & 3) === 3 && (n & 3) === 3) {
             t = -t;
         }
-        a = a % n;
+        a = (a | 0) % (n | 0);
     }
     return n === 1 ? t : 0;
 }
@@ -1277,7 +1277,7 @@ function getBestMultiplier(n, primesList) {
   let best = 1;
   for (let m = 1; m <= scores.length; m += 1) {
     var y = +scores[m];
-    if (y > max) {
+    if (+y > +max) {
       max = y;
       best = m;
     }
