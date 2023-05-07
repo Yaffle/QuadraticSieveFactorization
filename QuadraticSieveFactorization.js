@@ -1216,7 +1216,7 @@ function computeY(primeBase, solution, N) {
 
 // a/n is represented as (a,n)
 function legendre(a, n) {
-    if (typeof a !== 'number' || typeof b !== 'number') {
+    if (typeof a !== 'number' || typeof n !== 'number') {
       throw new TypeError();
     }
     // from https://en.wikipedia.org/wiki/Jacobi_symbol#Implementation_in_C++ :
