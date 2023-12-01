@@ -455,30 +455,32 @@ function packedDoubleArray(n) {
 
 function AsmModule(stdlib, foreign, heap) {
   "use asm";
-  var wheelData = new stdlib.Uint32Array(heap);
-  var wheelData16 = new stdlib.Uint16Array(heap);
+  var heap32 = new stdlib.Int32Array(heap);
+  var heap8 = new stdlib.Uint8Array(heap);
   var SIEVE_SEGMENT = new stdlib.Uint8Array(heap);
-  function singleBlockSieve(startWheelData, endWheelData, subsegmentEnd, s, p) {
-    startWheelData = startWheelData | 0;
-    endWheelData = endWheelData | 0;
+  function singleBlockSieve(wheelRoots1, wheelRoots2, wheelSteps, wheelLogs, startWheel, endWheel, subsegmentEnd, s) {
+    wheelRoots1 = wheelRoots1 | 0;
+    wheelRoots2 = wheelRoots2 | 0;
+    wheelSteps = wheelSteps | 0;
+    wheelLogs = wheelLogs | 0;
+    startWheel = startWheel | 0;
+    endWheel = endWheel | 0;
     subsegmentEnd = subsegmentEnd | 0;
     s = s | 0;
-    p = p | 0;
-    //if (subsegmentEnd > SIEVE_SEGMENT.length || endWheel > wheelData.length || startWheel < 0) {
+    //if (subsegmentEnd > SIEVE_SEGMENT.length || endWheel > wheelsCount || startWheel < 0) {
     //  return 1;
     //}
-    var step = 0;
-    var log2p = 0;
     var kpplusr = 0;
     var kpplusr2 = 0;
+    var step = 0;
+    var log2p = 0;
     var tmp = 0;
     var wheel = 0;
-    step = p;
-    for (wheel = startWheelData; (wheel | 0) < (endWheelData | 0); wheel = ((wheel + 12) | 0)) {
-      kpplusr = wheelData[(wheel) >> 2] | 0;
-      kpplusr2 = wheelData[(wheel + 4) >> 2] | 0;
-      log2p = wheelData16[(wheel + 8) >> 1] | 0;
-      step = (step + (wheelData16[(wheel + 10) >> 1] | 0)) | 0;
+    for (wheel = startWheel; (wheel | 0) < (endWheel | 0); wheel = ((wheel + 4) | 0)) {
+      kpplusr = heap32[(wheelRoots1 + wheel) >> 2] | 0;
+      kpplusr2 = heap32[(wheelRoots2 + wheel) >> 2] | 0;
+      step = heap32[(wheelSteps + wheel) >> 2] | 0;
+      log2p = heap8[(wheelLogs + (wheel >>> 2)) >> 0] >>> 0;
       while ((kpplusr2 | 0) < (subsegmentEnd | 0)) {
         SIEVE_SEGMENT[kpplusr] = ((SIEVE_SEGMENT[kpplusr] | 0) + log2p) | 0;
         kpplusr = (kpplusr + step) | 0;
@@ -492,8 +494,8 @@ function AsmModule(stdlib, foreign, heap) {
         kpplusr = kpplusr2;
         kpplusr2 = tmp;
       }
-      wheelData[(wheel) >> 2] = (kpplusr - s) | 0;
-      wheelData[(wheel + 4) >> 2] = (kpplusr2 - s) | 0;
+      heap32[(wheelRoots1 + wheel) >> 2] = (kpplusr - s) | 0;
+      heap32[(wheelRoots2 + wheel) >> 2] = (kpplusr2 - s) | 0;
     }
     return 0;
   }
@@ -512,29 +514,28 @@ const wast = (strings) => String.raw({ raw: strings });
 
 const wastCode = wast`
 (module
- (type $type1 (func (param i32 i32 i32 i32 i32) (result i32)))
+ (type $type1 (func (param i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $type2 (func (param i32 i32) (result i32)))
  (import "env" "memory" (memory $0 0))
  (export "singleBlockSieve" (func $singleBlockSieve))
  (export "findSmoothEntry" (func $findSmoothEntry))
- (func $singleBlockSieve (param $startWheelData i32) (param $endWheelData i32) (param $subsegmentEnd i32) (param $s i32) (param $p i32) (result i32)
-  (local $step i32)
-  (local $log2p i32)
+ (func $singleBlockSieve (param $wheelRoots1 i32) (param $wheelRoots2 i32) (param $wheelSteps i32) (param $wheelLogs i32) (param $startWheel i32) (param $endWheel i32) (param $subsegmentEnd i32) (param $s i32) (result i32)
   (local $kpplusr i32)
   (local $kpplusr2 i32)
+  (local $step i32)
+  (local $log2p i32)
   (local $k i32)
   (local $k2 i32)
   (local $tmp i32)
   (local $wheel i32)
-  (local.set $step (local.get $p))
-  (local.set $wheel (local.get $startWheelData))
+  (local.set $wheel (local.get $startWheel))
   (loop $wheels
-   (if (i32.lt_u (local.get $wheel) (local.get $endWheelData))
+   (if (i32.lt_u (local.get $wheel) (local.get $endWheel))
     (block
-     (local.set $kpplusr (i32.load offset=0 (local.get $wheel)))
-     (local.set $kpplusr2 (i32.load offset=4 (local.get $wheel)))
-     (local.set $log2p (i32.load16_u offset=8 (local.get $wheel)))
-     (local.set $step (i32.add (local.get $step) (i32.load16_u offset=10 (local.get $wheel))))
+     (local.set $kpplusr (i32.load (i32.add (local.get $wheelRoots1) (local.get $wheel))))
+     (local.set $kpplusr2 (i32.load (i32.add (local.get $wheelRoots2) (local.get $wheel))))
+     (local.set $step (i32.load (i32.add (local.get $wheelSteps) (local.get $wheel))))
+     (local.set $log2p (i32.load8_u (i32.add (local.get $wheelLogs) (i32.shr_u (local.get $wheel) (i32.const 2)))))
      (loop $sieving
       (if (i32.lt_u (local.get $kpplusr2) (local.get $subsegmentEnd))
        (block
@@ -555,9 +556,9 @@ const wastCode = wast`
        (local.set $kpplusr2 (local.get $tmp))
       )
      )
-     (i32.store offset=0 (local.get $wheel) (i32.sub (local.get $kpplusr) (local.get $s)))
-     (i32.store offset=4 (local.get $wheel) (i32.sub (local.get $kpplusr2) (local.get $s)))
-     (local.set $wheel (i32.add (local.get $wheel) (i32.const 12)))
+     (i32.store (i32.add (local.get $wheelRoots1) (local.get $wheel)) (i32.sub (local.get $kpplusr) (local.get $s)))
+     (i32.store (i32.add (local.get $wheelRoots2) (local.get $wheel)) (i32.sub (local.get $kpplusr2) (local.get $s)))
+     (local.set $wheel (i32.add (local.get $wheel) (i32.const 4)))
      (br $wheels)
     )
    )
@@ -661,6 +662,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   wheels0.sort((a, b) => +a.step - +b.step);
 
   const wheelRoots = packedDoubleArray(wheels0.length);
+  const wheelLogs0 = packedDoubleArray(wheels0.length);
+  const invCache = packedDoubleArray(wheels0.length);
+  let invCacheKey = 0n;
 
   function nextValidHeapSize(size) {
     size = Math.max(size, 2**12);
@@ -669,38 +673,46 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     return Math.ceil(size / 2**24) * 2**24;
   }
+  
+  const wheelsCount = wheels0.length;
+  console.assert(segmentSize % 4 === 0);
 
-  const bufferSize = nextValidHeapSize(segmentSize + wheels0.length * 3 * 4);
+  let memorySize = 0;
+  memorySize += segmentSize;
+  const wheelRoots1 = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  const wheelRoots2 = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  const wheelSteps = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  const wheelLogs = memorySize >> 0;
+  memorySize += wheelsCount;
+
+  const bufferSize = nextValidHeapSize(memorySize);
   const exports = instantiate(bufferSize);
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
+
   const arrayBuffer = exports.memory.buffer;
   const SIEVE_SEGMENT = new Uint8Array(arrayBuffer);
-  const wheelData = new Uint32Array(arrayBuffer);
-  console.assert(segmentSize % 4 === 0);
-  const wheelDataOffset = segmentSize / 4;
-  const wheelsCount = wheels0.length;
-  
-  const wheelLogs = [];
+  const heap32 = new Int32Array(arrayBuffer);
+  const heap8 = new Uint8Array(arrayBuffer);
 
-  let previous = 0;
   for (let i = 0; i < wheelsCount; i += 1) {
     const w = wheels0[i];
-    const wheel = wheelDataOffset + (i * 3);
     const wheelLog = Math.log2(w.p) * (w.step === 2 || w.root === 0 ? 0.5 : 1);
     const log = Math.round(wheelLog * SCALE) | 0;
-    const gap = (w.step | 0) - previous;
-    if (gap >= 2**14 || log >= 2**14) {
+    if (log >= 2**8) {
       throw new RangeError();
     }
-    previous = w.step;
 
-    wheelData[wheel] = 0;
-    wheelData[wheel + 1] = 0;
-    wheelData[wheel + 2] = log | (gap << 16);
+    heap32[wheelRoots1 + i] = 0;
+    heap32[wheelRoots2 + i] = 0;
+    heap32[wheelSteps + i] = w.step;
+    heap8[wheelLogs + i] = log;
+
     wheelRoots[i] = -0 + w.root;
-
-    wheelLogs.push(wheelLog);
+    wheelLogs0[i] = wheelLog;
   }
 
   const lpStrategy = function (p, polynomial, x, pb) {
@@ -742,16 +754,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
 
-  let invCacheKey = 0n;
-  const invCache = packedDoubleArray(wheels0.length);
-
   function checkWheels(offset) {
-    let p = 0;
     for (let k = 0; k < wheelsCount; k += 1) {
-      const wheel = wheelDataOffset + (k * 3);
-      p += wheelData[wheel + 2] >> 16;
+      const p = heap32[wheelSteps + k] | 0;
       for (let v = 0; v <= 1; v += 1) {
-        const root = (v === 0 ? wheelData[wheel] : wheelData[wheel + 1]);
+        const root = (v === 0 ? heap32[wheelRoots1 + k] : heap32[wheelRoots2 + k]);
         if (root !== sieveSize) {
           const x = BigInt(+root + offset);
           const X = (polynomial.A * x + polynomial.B);
@@ -772,10 +779,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
     const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
-    let p = -0;
     for (let i = 0; i < wheelsCount; i += 1) {
-      const wheel = (wheelDataOffset + (((i << 1) + i) | 0)) | 0;
-      p = p + +(wheelData[wheel + 2] >> 16);
+      const p = -0 + (heap32[wheelSteps + i] | 0);
       const root = -0 + wheelRoots[i];
       if (!useCache) {
         //const a = Number(polynomial.A % BigInt(p));
@@ -790,8 +795,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         // single root:
         // x = (2B)^-1*(-C) (mod p)
         // skip as the performance is not better
-        wheelData[wheel] = sieveSize;
-        wheelData[wheel + 1] = sieveSize;
+        heap32[wheelRoots1 + i] = sieveSize;
+        heap32[wheelRoots2 + i] = sieveSize;
       } else {
         const e = p - b + p;
         let x1 = (e + root) * invA - offset;
@@ -801,8 +806,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const r1 = x1 | 0; // x1 mod p
         const r2 = x2 | 0; // x2 mod p
         const s = ((r1 - r2) & ((r1 - r2) >> 31));
-        wheelData[wheel] = r2 + s; // min(r1, r2)
-        wheelData[wheel + 1] = r1 - s; // max(r1, r2)
+        heap32[wheelRoots1 + i] = r2 + s; // min(r1, r2)
+        heap32[wheelRoots2 + i] = r1 - s; // max(r1, r2)
       }
     }
     invCacheKey = polynomial.A;
@@ -854,18 +859,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     let cycleLength = 1;
     SIEVE_SEGMENT[0] = SHIFT;
-    let p = 0;
     for (let j = 0; j < smallWheels; j += 1) {
-      const wheel = (wheelDataOffset + (((j << 1) + j) | 0)) | 0;
-      const newCycleLength = +lcm(cycleLength, p + (wheelData[wheel + 2] >> 16));
+      const newCycleLength = +lcm(cycleLength, heap32[wheelSteps + j]);
       copyCycle(SIEVE_SEGMENT, cycleLength, newCycleLength);
       cycleLength = newCycleLength;
-      p = (p + (wheelData[wheel + 2] >> 16)) | 0;
-      const log2p = wheelData[wheel + 2] & 0xFFFF;
-      for (let k = ((wheelData[wheel] | 0) + newCycleLength - segmentStart % newCycleLength) % p; k < newCycleLength; k += p) {
+      const p = heap32[wheelSteps + j];
+      const log2p = heap8[wheelLogs + j];
+      for (let k = ((heap32[wheelRoots1 + j] | 0) + newCycleLength - segmentStart % newCycleLength) % p; k < newCycleLength; k += p) {
         SIEVE_SEGMENT[k] = (SIEVE_SEGMENT[k] + log2p) | 0;
       }
-      for (let k = ((wheelData[wheel + 1] | 0) + newCycleLength - segmentStart % newCycleLength) % p; k < newCycleLength; k += p) {
+      for (let k = ((heap32[wheelRoots2 + j] | 0) + newCycleLength - segmentStart % newCycleLength) % p; k < newCycleLength; k += p) {
         SIEVE_SEGMENT[k] = (SIEVE_SEGMENT[k] + log2p) | 0;
       }
     }
@@ -878,12 +881,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**18 ? 2 : 1)));
     const S = Math.floor(2**15 * m - V * 4);
     let subsegmentEnd = 0;
-    console.assert(wheelDataOffset % 3 === 0);
     while (subsegmentEnd + S <= segmentSize) {
       subsegmentEnd += S;
-      singleBlockSieve(smallWheels * 12 + wheelDataOffset * 4, smallWheels * 12 + V * 12 + wheelDataOffset * 4, subsegmentEnd, 0, p);
+      singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, wheelLogs, smallWheels * 4, smallWheels * 4 + V * 4, subsegmentEnd, 0);
     }
-    singleBlockSieve(smallWheels * 12 + wheelDataOffset * 4, wheelsCount * 12 + wheelDataOffset * 4, segmentSize, segmentSize, p);
+    singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, wheelLogs, smallWheels * 4, wheelsCount * 4, segmentSize, segmentSize);
   };
 
   const smoothEntries = [];
@@ -925,13 +927,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   function checkFactorization(x) {
     let p = 0;
-    let step = 0;
     for (let n = 0; n < wheelsCount; n += 1) {
-      const wheel = wheelDataOffset + (n * 3);
-      const log2p = wheelData[wheel + 2] & 0xFFFF;
-      step += (wheelData[wheel + 2] >> 16);
+      const log2p = heap8[wheelLogs + n];
+      const step = heap32[wheelSteps + n];
       for (let v = 0; v <= 1; v += 1) {
-        if ((x - (v === 0 ? (wheelData[wheel] | 0) : (wheelData[wheel + 1] | 0)) - (n < smallWheels ? 0 : segmentSize)) % step === 0) {
+        if ((x - (v === 0 ? (heap32[wheelRoots1 + n] | 0) : (heap32[wheelRoots2 + n] | 0)) - (n < smallWheels ? 0 : segmentSize)) % step === 0) {
           if (polynomial.AFactors.indexOf(step) === -1) {
             console.log(step);
             p += log2p;
@@ -943,16 +943,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
 
   function applyOffset(offset) {
-    let step = 0;
     for (let j = 0; j < wheelsCount; j += 1) {
-      const wheel = wheelDataOffset + (j * 3);
-      step += wheelData[wheel + 2] >> 16;
+      const step = heap32[wheelSteps + j];
       let r1 = (0 + (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
       r1 += (r1 < 0 ? step : 0);
       let r2 = (0 - (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
       r2 += (r2 < 0 ? step : 0);
-      wheelData[wheel] = Math.min(r1, r2);
-      wheelData[wheel + 1] = Math.max(r1, r2);
+      heap32[wheelRoots1 + j] = Math.min(r1, r2);
+      heap32[wheelRoots2 + j] = Math.max(r1, r2);
     }
   }
 
@@ -984,13 +982,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     // 512*3 - 3061
     // 768 - 3290
     // 1024 - 3295
-    const A = Math.max(smallWheels, Math.min(1024, Math.ceil(wheelsCount / 1)));
-    let step = 0;
+    const A = Math.max(smallWheels, Math.min(1024 * 2, Math.ceil(wheelsCount / 1)));
     for (let j = 0; j < A; j += 1) {
-      const wheel = (wheelDataOffset + (((j << 1) + j) | 0)) | 0;
-      let proot1 = wheelData[wheel] | 0;
-      let proot2 = wheelData[wheel + 1] | 0;
-      step = (step + (wheelData[wheel + 2] >> 16)) | 0;
+      let proot1 = heap32[wheelRoots1 + j] | 0;
+      let proot2 = heap32[wheelRoots2 + j] | 0;
+      const step = heap32[wheelSteps + j] | 0;
       if (proot1 === 0 && proot2 === 0) {
         if (j >= smallWheels) {
           continue;
@@ -1006,11 +1002,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const e = smoothEntriesX[i];
         const x = e - Math.floor(e * stepInv) * step1;
         if (x === a) {
-          smoothEntries2A[i] += +wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs0[j];
           smoothEntries3[i].push(step);
         }
         if (x === b) {
-          smoothEntries2A[i] += +wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs0[j];
           smoothEntries3[i].push(step);
         }
       }
@@ -1020,17 +1016,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       if ((set[ah >> 3] & (1 << (ah & 7))) !== 0) {
         const i = indexOf(smoothEntries, 0 + a + offset);
         if (i !== -1) {
-          smoothEntries2A[i] += +wheelLogs[j];
+          smoothEntries2A[i] += +wheelLogs0[j];
           smoothEntries3[i].push(step);
         }
       }
     };
     //console.assert(wheels0.length > 0 && sieveSize >= wheels0[wheels0.length - 1].step);
     for (let j = A; j < wheelsCount; j += 1) {
-      const wheel = (wheelDataOffset + (((j << 1) + j) | 0)) | 0;
-      const proot1 = wheelData[wheel] | 0;
-      const proot2 = wheelData[wheel + 1] | 0;
-      step = (step + (wheelData[wheel + 2] >> 16)) | 0;
+      const proot1 = heap32[wheelRoots1 + j] | 0;
+      const proot2 = heap32[wheelRoots2 + j] | 0;
+      const step = heap32[wheelSteps + j] | 0;
       // "rotate" the wheel instead:
       let a = (proot1 + ((sieveSize - step) | 0)) | 0;
       let b = (proot2 + ((sieveSize - step) | 0)) | 0;
