@@ -1,3 +1,4 @@
+"use strict";
 
 // https://rosettacode.org/wiki/Tonelli-Shanks_algorithm#Python
 
@@ -15,10 +16,46 @@ function modPowSmall(base, exponent, modulus) {
   return accumulator;
 }
 
-function legendre(a, p) {
-  console.assert((p - 1) % 2 === 0);
-  return modPowSmall(a, (p - 1) / 2, p);
+//function legendre(a, p) {
+//  console.assert((p - 1) % 2 === 0);
+//  return (modPowSmall(a, (p - 1) / 2, p) + 1) % p - 1;
+//}
+
+// a/n is represented as (a,n)
+function legendre(a, n) {
+    if (typeof a !== 'number' || typeof n !== 'number') {
+      throw new TypeError();
+    }
+    // from https://en.wikipedia.org/wiki/Jacobi_symbol#Implementation_in_C++ :
+    a = a | 0;
+    n = n | 0;
+    //console.assert(n > 0 && n%2 == 1);
+    //step 1
+    a = (a | 0) % (n | 0);
+    var t = 1;
+    var r = 0;
+    //step 3
+    while (a !== 0) {
+        //step 2
+        while ((a & 1) === 0) {
+            a >>= 1;
+            r = n & 7;
+            if (r === 3 || r === 5) {
+                t = -t;
+            }
+        }
+        //step 4
+        r = n;
+        n = a;
+        a = r;
+        if ((a & 3) === 3 && (n & 3) === 3) {
+            t = -t;
+        }
+        a = (a | 0) % (n | 0);
+    }
+    return n === 1 ? t : 0;
 }
+
 
 function sqrtMod(n, p) {
   // Tonelli–Shanks algorithm:
@@ -37,7 +74,7 @@ function sqrtMod(n, p) {
     return modPowSmall(n, (p + 1) / 4, p);
   }
   let z = 2;
-  while (z <= p && p - 1 !== legendre(z, p)) {
+  while (z <= p && legendre(z, p) !== -1) {
     z += 1;
   }
   let c = modPowSmall(z, q, p);

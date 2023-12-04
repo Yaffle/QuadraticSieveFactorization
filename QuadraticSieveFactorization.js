@@ -445,81 +445,19 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 // https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
 
-function packedDoubleArray(n) {
-  const array = [];
-  for (let i = 0; i < n; i += 1) {
-    array.push(-0);
-  }
-  return array.slice(0);
-}
-
-function AsmModule(stdlib, foreign, heap) {
-  "use asm";
-  var heap32 = new stdlib.Int32Array(heap);
-  var heap8 = new stdlib.Uint8Array(heap);
-  var SIEVE_SEGMENT = new stdlib.Uint8Array(heap);
-  function singleBlockSieve(wheelRoots1, wheelRoots2, wheelSteps, wheelLogs, startWheel, endWheel, subsegmentEnd, s) {
-    wheelRoots1 = wheelRoots1 | 0;
-    wheelRoots2 = wheelRoots2 | 0;
-    wheelSteps = wheelSteps | 0;
-    wheelLogs = wheelLogs | 0;
-    startWheel = startWheel | 0;
-    endWheel = endWheel | 0;
-    subsegmentEnd = subsegmentEnd | 0;
-    s = s | 0;
-    //if (subsegmentEnd > SIEVE_SEGMENT.length || endWheel > wheelsCount || startWheel < 0) {
-    //  return 1;
-    //}
-    var kpplusr = 0;
-    var kpplusr2 = 0;
-    var step = 0;
-    var log2p = 0;
-    var tmp = 0;
-    var wheel = 0;
-    for (wheel = startWheel; (wheel | 0) < (endWheel | 0); wheel = ((wheel + 4) | 0)) {
-      kpplusr = heap32[(wheelRoots1 + wheel) >> 2] | 0;
-      kpplusr2 = heap32[(wheelRoots2 + wheel) >> 2] | 0;
-      step = heap32[(wheelSteps + wheel) >> 2] | 0;
-      log2p = heap8[(wheelLogs + (wheel >>> 2)) >> 0] >>> 0;
-      while ((kpplusr2 | 0) < (subsegmentEnd | 0)) {
-        SIEVE_SEGMENT[kpplusr] = ((SIEVE_SEGMENT[kpplusr] | 0) + log2p) | 0;
-        kpplusr = (kpplusr + step) | 0;
-        SIEVE_SEGMENT[kpplusr2] = ((SIEVE_SEGMENT[kpplusr2] | 0) + log2p) | 0;
-        kpplusr2 = (kpplusr2 + step) | 0;
-      }
-      if ((kpplusr | 0) < (subsegmentEnd | 0)) {
-        SIEVE_SEGMENT[kpplusr] = ((SIEVE_SEGMENT[kpplusr] | 0) + log2p) | 0;
-        kpplusr = (kpplusr + step) | 0;
-        tmp = kpplusr;
-        kpplusr = kpplusr2;
-        kpplusr2 = tmp;
-      }
-      heap32[(wheelRoots1 + wheel) >> 2] = (kpplusr - s) | 0;
-      heap32[(wheelRoots2 + wheel) >> 2] = (kpplusr2 - s) | 0;
-    }
-    return 0;
-  }
-  function findSmoothEntry(thresholdApproximation, i) {
-    thresholdApproximation = thresholdApproximation | 0;
-    i = i | 0;
-    while ((thresholdApproximation | 0) >= (SIEVE_SEGMENT[i] | 0)) {
-      i = (i + 1) | 0;
-    }
-    return i | 0;
-  }
-  return {singleBlockSieve: singleBlockSieve, findSmoothEntry: findSmoothEntry};
-}
 
 const wast = (strings) => String.raw({ raw: strings });
 
 const wastCode = wast`
 (module
- (type $type1 (func (param i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
+ (type $type1 (func (param i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $type2 (func (param i32 i32) (result i32)))
+ (type $type3 (func (param i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (import "env" "memory" (memory $0 0))
  (export "singleBlockSieve" (func $singleBlockSieve))
  (export "findSmoothEntry" (func $findSmoothEntry))
- (func $singleBlockSieve (param $wheelRoots1 i32) (param $wheelRoots2 i32) (param $wheelSteps i32) (param $wheelLogs i32) (param $startWheel i32) (param $endWheel i32) (param $subsegmentEnd i32) (param $s i32) (result i32)
+ (export "updateWheelsInternal" (func $updateWheelsInternal))
+ (func $singleBlockSieve (param $wheelRoots1 i32) (param $wheelRoots2 i32) (param $wheelSteps i32) (param $startWheel i32) (param $endWheel i32) (param $subsegmentEnd i32) (param $s i32) (result i32)
   (local $kpplusr i32)
   (local $kpplusr2 i32)
   (local $step i32)
@@ -528,20 +466,24 @@ const wastCode = wast`
   (local $k2 i32)
   (local $tmp i32)
   (local $wheel i32)
+  (local $log i32)
+  (local $log2 i32)
   (local.set $wheel (local.get $startWheel))
   (loop $wheels
    (if (i32.lt_u (local.get $wheel) (local.get $endWheel))
     (block
-     (local.set $kpplusr (i32.load (i32.add (local.get $wheelRoots1) (local.get $wheel))))
-     (local.set $kpplusr2 (i32.load (i32.add (local.get $wheelRoots2) (local.get $wheel))))
-     (local.set $step (i32.load (i32.add (local.get $wheelSteps) (local.get $wheel))))
-     (local.set $log2p (i32.load8_u (i32.add (local.get $wheelLogs) (i32.shr_u (local.get $wheel) (i32.const 2)))))
+     (local.set $kpplusr (i32.load (i32.add (local.get $wheel) (local.get $wheelRoots1))))
+     (local.set $kpplusr2 (i32.load (i32.add (local.get $wheel) (local.get $wheelRoots2))))
+     (local.set $step (i32.and (i32.load (i32.add (local.get $wheel) (local.get $wheelSteps))) (i32.const 134217727)))
+     (local.set $log2p (i32.shr_u (i32.load (i32.add (local.get $wheel) (local.get $wheelSteps))) (i32.const 27)))
      (loop $sieving
       (if (i32.lt_u (local.get $kpplusr2) (local.get $subsegmentEnd))
        (block
-        (i32.store8 (local.get $kpplusr) (i32.add (i32.load8_u (local.get $kpplusr)) (local.get $log2p)))
+        (local.set $log (i32.add (i32.load8_u (local.get $kpplusr)) (local.get $log2p)))
+        (local.set $log2 (i32.add (i32.load8_u (local.get $kpplusr2)) (local.get $log2p)))
+        (i32.store8 (local.get $kpplusr) (local.get $log))
+        (i32.store8 (local.get $kpplusr2) (local.get $log2))
         (local.set $kpplusr (i32.add (local.get $kpplusr) (local.get $step)))
-        (i32.store8 (local.get $kpplusr2) (i32.add (i32.load8_u (local.get $kpplusr2)) (local.get $log2p)))
         (local.set $kpplusr2 (i32.add (local.get $kpplusr2) (local.get $step)))
         (br $sieving)
        )
@@ -556,8 +498,8 @@ const wastCode = wast`
        (local.set $kpplusr2 (local.get $tmp))
       )
      )
-     (i32.store (i32.add (local.get $wheelRoots1) (local.get $wheel)) (i32.sub (local.get $kpplusr) (local.get $s)))
-     (i32.store (i32.add (local.get $wheelRoots2) (local.get $wheel)) (i32.sub (local.get $kpplusr2) (local.get $s)))
+     (i32.store (i32.add (local.get $wheel) (local.get $wheelRoots1)) (i32.sub (local.get $kpplusr) (local.get $s)))
+     (i32.store (i32.add (local.get $wheel) (local.get $wheelRoots2)) (i32.sub (local.get $kpplusr2) (local.get $s)))
      (local.set $wheel (i32.add (local.get $wheel) (i32.const 4)))
      (br $wheels)
     )
@@ -578,6 +520,583 @@ const wastCode = wast`
   )
   (return (local.get $i))
  )
+
+ (func $updateWheelsInternal (param $wheelsCount i32) (param $wheelSteps i32) (param $wheelRoots i32) (param $invCache i32) (param $BB i32) (param $BBlength i32) (param $offset i32) (param $wheelRoots1 i32) (param $wheelRoots2 i32) (result i32)
+  (local $offsetValue v128)
+  (local $i i32)
+  (local $pc v128)
+  (local $rootc v128)
+  (local $invAc v128)
+  (local $twoTo52 v128)
+  (local $mask v128)
+  (local $p_even v128)
+  (local $p_odd v128)
+  (local $root_even v128)
+  (local $root_odd v128)
+  (local $invA_even v128)
+  (local $invA_odd v128)
+  (local $pInv_even v128)
+  (local $pInv_odd v128)
+  (local $j i32)
+  (local $BBj v128)
+  (local $b_even v128)
+  (local $b_odd v128)
+  (local $x_even v128)
+  (local $x_odd v128)
+  (local $e_even v128)
+  (local $e_odd v128)
+  (local $x1_even v128)
+  (local $x1_odd v128)
+  (local $x2_even v128)
+  (local $x2_odd v128)
+  (local $x1c v128)
+  (local $x2c v128)
+  (local $r1 v128)
+  (local $r2 v128)
+  (local $k i32)
+  (local $wheel i32)
+  (local $r1s i32)
+  (local $r2s i32)
+  (local.set $offsetValue
+   (f64x2.splat
+    (f64.convert_i32_s
+     (local.get $offset)
+    )
+   )
+  )
+  (local.set $i
+   (i32.const 0)
+  )
+  (loop $for-loop|0
+   (if
+    (i32.lt_s
+     (local.get $i)
+     (i32.shl
+      (local.get $wheelsCount)
+      (i32.const 2)
+     )
+    )
+    (block
+     (local.set $pc
+      (v128.and
+        (v128.load
+         (i32.add
+          (local.get $wheelSteps)
+          (local.get $i)
+         )
+        )
+        (i32x4.splat (i32.const 134217727))
+      )
+     )
+     (local.set $rootc
+      (v128.load
+       (i32.add
+        (local.get $wheelRoots)
+        (local.get $i)
+       )
+      )
+     )
+     (local.set $invAc
+      (v128.load
+       (i32.add
+        (local.get $invCache)
+        (local.get $i)
+       )
+      )
+     )
+     (local.set $twoTo52
+      (i64x2.splat (i64.const 0x4330000000000000))
+     )
+     (local.set $mask
+      (i64x2.splat (i64.const 0x00000000ffffffff))
+     )
+     (local.set $p_even
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $pc)
+          (i32.const 0)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $p_odd
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $pc)
+          (i32.const 32)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $root_even
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $rootc)
+          (i32.const 0)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $root_odd
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $rootc)
+          (i32.const 32)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $invA_even
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $invAc)
+          (i32.const 0)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $invA_odd
+      (f64x2.sub
+       (v128.or
+        (local.get $twoTo52)
+        (v128.and
+         (i64x2.shr_u
+          (local.get $invAc)
+          (i32.const 32)
+         )
+         (local.get $mask)
+        )
+       )
+       (local.get $twoTo52)
+      )
+     )
+     (local.set $pInv_even
+      (f64x2.div
+       (i64x2.splat
+        (i64.const 4607182418800017409)
+       )
+       (local.get $p_even)
+      )
+     )
+     (local.set $pInv_odd
+      (f64x2.div
+       (i64x2.splat
+        (i64.const 4607182418800017409)
+       )
+       (local.get $p_odd)
+      )
+     )
+     (local.set $j
+      (i32.shl
+       (i32.sub
+        (local.get $BBlength)
+        (i32.const 1)
+       )
+       (i32.const 3)
+      )
+     )
+     (local.set $BBj
+      (f64x2.splat
+       (f64.load
+        (i32.add
+         (local.get $BB)
+         (local.get $j)
+        )
+       )
+      )
+     )
+     (local.set $b_even
+      (local.get $BBj)
+     )
+     (local.set $b_odd
+      (local.get $BBj)
+     )
+     (local.set $b_even
+      (f64x2.sub
+       (local.get $b_even)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $b_even)
+          (local.get $pInv_even)
+         )
+        )
+        (local.get $p_even)
+       )
+      )
+     )
+     (local.set $b_odd
+      (f64x2.sub
+       (local.get $b_odd)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $b_odd)
+          (local.get $pInv_odd)
+         )
+        )
+        (local.get $p_odd)
+       )
+      )
+     )
+     (if
+      (i32.ne
+       (local.get $j)
+       (i32.const 0)
+      )
+      (block
+       (local.set $x_even
+        (i64x2.splat
+         (i64.const 4836865999795912704)
+        )
+       )
+       (local.set $x_odd
+        (i64x2.splat
+         (i64.const 4836865999795912704)
+        )
+       )
+       (local.set $x_even
+        (f64x2.sub
+         (local.get $x_even)
+         (f64x2.mul
+          (f64x2.floor
+           (f64x2.mul
+            (local.get $x_even)
+            (local.get $pInv_even)
+           )
+          )
+          (local.get $p_even)
+         )
+        )
+       )
+       (local.set $x_odd
+        (f64x2.sub
+         (local.get $x_odd)
+         (f64x2.mul
+          (f64x2.floor
+           (f64x2.mul
+            (local.get $x_odd)
+            (local.get $pInv_odd)
+           )
+          )
+          (local.get $p_odd)
+         )
+        )
+       )
+       (loop $do-loop|1
+        (local.set $j
+         (i32.sub
+          (local.get $j)
+          (i32.const 8)
+         )
+        )
+        (local.set $BBj
+         (f64x2.splat
+          (f64.load
+           (i32.add
+            (local.get $BB)
+            (local.get $j)
+           )
+          )
+         )
+        )
+        (local.set $b_even
+         (f64x2.add
+          (f64x2.mul
+           (local.get $b_even)
+           (local.get $x_even)
+          )
+          (local.get $BBj)
+         )
+        )
+        (local.set $b_odd
+         (f64x2.add
+          (f64x2.mul
+           (local.get $b_odd)
+           (local.get $x_odd)
+          )
+          (local.get $BBj)
+         )
+        )
+        (local.set $b_even
+         (f64x2.sub
+          (local.get $b_even)
+          (f64x2.mul
+           (f64x2.floor
+            (f64x2.mul
+             (local.get $b_even)
+             (local.get $pInv_even)
+            )
+           )
+           (local.get $p_even)
+          )
+         )
+        )
+        (local.set $b_odd
+         (f64x2.sub
+          (local.get $b_odd)
+          (f64x2.mul
+           (f64x2.floor
+            (f64x2.mul
+             (local.get $b_odd)
+             (local.get $pInv_odd)
+            )
+           )
+           (local.get $p_odd)
+          )
+         )
+        )
+        (br_if $do-loop|1
+         (i32.ne
+          (local.get $j)
+          (i32.const 0)
+         )
+        )
+       )
+      )
+     )
+     (local.set $e_even
+      (f64x2.add
+       (f64x2.sub
+        (local.get $p_even)
+        (local.get $b_even)
+       )
+       (local.get $p_even)
+      )
+     )
+     (local.set $e_odd
+      (f64x2.add
+       (f64x2.sub
+        (local.get $p_odd)
+        (local.get $b_odd)
+       )
+       (local.get $p_odd)
+      )
+     )
+     (local.set $x1_even
+      (f64x2.sub
+       (f64x2.mul
+        (f64x2.add
+         (local.get $e_even)
+         (local.get $root_even)
+        )
+        (local.get $invA_even)
+       )
+       (local.get $offsetValue)
+      )
+     )
+     (local.set $x1_odd
+      (f64x2.sub
+       (f64x2.mul
+        (f64x2.add
+         (local.get $e_odd)
+         (local.get $root_odd)
+        )
+        (local.get $invA_odd)
+       )
+       (local.get $offsetValue)
+      )
+     )
+     (local.set $x2_even
+      (f64x2.sub
+       (f64x2.mul
+        (f64x2.sub
+         (local.get $e_even)
+         (local.get $root_even)
+        )
+        (local.get $invA_even)
+       )
+       (local.get $offsetValue)
+      )
+     )
+     (local.set $x2_odd
+      (f64x2.sub
+       (f64x2.mul
+        (f64x2.sub
+         (local.get $e_odd)
+         (local.get $root_odd)
+        )
+        (local.get $invA_odd)
+       )
+       (local.get $offsetValue)
+      )
+     )
+     (local.set $x1_even
+      (f64x2.sub
+       (local.get $x1_even)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $x1_even)
+          (local.get $pInv_even)
+         )
+        )
+        (local.get $p_even)
+       )
+      )
+     )
+     (local.set $x1_odd
+      (f64x2.sub
+       (local.get $x1_odd)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $x1_odd)
+          (local.get $pInv_odd)
+         )
+        )
+        (local.get $p_odd)
+       )
+      )
+     )
+     (local.set $x2_even
+      (f64x2.sub
+       (local.get $x2_even)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $x2_even)
+          (local.get $pInv_even)
+         )
+        )
+        (local.get $p_even)
+       )
+      )
+     )
+     (local.set $x2_odd
+      (f64x2.sub
+       (local.get $x2_odd)
+       (f64x2.mul
+        (f64x2.floor
+         (f64x2.mul
+          (local.get $x2_odd)
+          (local.get $pInv_odd)
+         )
+        )
+        (local.get $p_odd)
+       )
+      )
+     )
+     (local.set $x1c
+      (v128.or
+       (i64x2.shl
+        (v128.and
+         (f64x2.add
+          (local.get $x1_even)
+          (local.get $twoTo52)
+         )
+         (local.get $mask)
+        )
+        (i32.const 0)
+       )
+       (i64x2.shl
+        (v128.and
+         (f64x2.add
+          (local.get $x1_odd)
+          (local.get $twoTo52)
+         )
+         (local.get $mask)
+        )
+        (i32.const 32)
+       )
+      )
+     )
+     (local.set $x2c
+      (v128.or
+       (i64x2.shl
+        (v128.and
+         (f64x2.add
+          (local.get $x2_even)
+          (local.get $twoTo52)
+         )
+         (local.get $mask)
+        )
+        (i32.const 0)
+       )
+       (i64x2.shl
+        (v128.and
+         (f64x2.add
+          (local.get $x2_odd)
+          (local.get $twoTo52)
+         )
+         (local.get $mask)
+        )
+        (i32.const 32)
+       )
+      )
+     )
+     (local.set $r1
+      (i32x4.min_s
+       (local.get $x1c)
+       (local.get $x2c)
+      )
+     )
+     (local.set $r2
+      (i32x4.max_s
+       (local.get $x1c)
+       (local.get $x2c)
+      )
+     )
+     (v128.store
+      (i32.add
+       (local.get $wheelRoots1)
+       (local.get $i)
+      )
+      (local.get $r1)
+     )
+     (v128.store
+      (i32.add
+       (local.get $wheelRoots2)
+       (local.get $i)
+      )
+      (local.get $r2)
+     )
+     (local.set $i
+      (i32.add
+       (local.get $i)
+       (i32.const 16)
+      )
+     )
+     (br $for-loop|0)
+    )
+   )
+  )
+  (return
+   (i32.const 0)
+  )
+ )
+
+ 
 )
 `;
 
@@ -660,11 +1179,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
   wheels0.sort((a, b) => +a.step - +b.step);
+  while (wheels0.length % 4 !== 0) {
+    wheels0.pop();
+  }
 
-  const wheelRoots = packedDoubleArray(wheels0.length);
-  const wheelLogs0 = packedDoubleArray(wheels0.length);
-  const invCache = packedDoubleArray(wheels0.length);
+  const wheelLogs0 = new Float64Array(wheels0.length);
   let invCacheKey = 0n;
+  const zeroInvs = [];
 
   function nextValidHeapSize(size) {
     size = Math.max(size, 2**12);
@@ -678,40 +1199,44 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   console.assert(segmentSize % 4 === 0);
 
   let memorySize = 0;
-  memorySize += segmentSize;
+  memorySize += segmentSize * 1;
+
   const wheelRoots1 = memorySize >> 2;
   memorySize += wheelsCount * 4;
   const wheelRoots2 = memorySize >> 2;
   memorySize += wheelsCount * 4;
   const wheelSteps = memorySize >> 2;
   memorySize += wheelsCount * 4;
-  const wheelLogs = memorySize >> 0;
-  memorySize += wheelsCount;
+
+  const wheelRoots = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  const invCache = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  memorySize += memorySize % 8;
+  const BBoffset = memorySize >> 3;
+  memorySize += 256 * 8;//?
 
   const bufferSize = nextValidHeapSize(memorySize);
   const exports = instantiate(bufferSize);
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
+  const updateWheelsInternal = exports.updateWheelsInternal;
 
   const arrayBuffer = exports.memory.buffer;
   const SIEVE_SEGMENT = new Uint8Array(arrayBuffer);
   const heap32 = new Int32Array(arrayBuffer);
-  const heap8 = new Uint8Array(arrayBuffer);
+  const f64array = new Float64Array(arrayBuffer);
 
   for (let i = 0; i < wheelsCount; i += 1) {
     const w = wheels0[i];
     const wheelLog = Math.log2(w.p) * (w.step === 2 || w.root === 0 ? 0.5 : 1);
     const log = Math.round(wheelLog * SCALE) | 0;
-    if (log >= 2**8) {
+    if (log >= 2**8 || w.step >= 2**27) {
       throw new RangeError();
     }
 
-    heap32[wheelRoots1 + i] = 0;
-    heap32[wheelRoots2 + i] = 0;
-    heap32[wheelSteps + i] = w.step;
-    heap8[wheelLogs + i] = log;
-
-    wheelRoots[i] = -0 + w.root;
+    heap32[wheelSteps + i] = w.step | (log << 27);
+    heap32[wheelRoots + i] = w.root;
     wheelLogs0[i] = wheelLog;
   }
 
@@ -747,7 +1272,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (!useMultiplePolynomials) {
     const baseOffset = BigInt(sqrt(N)) + 1n;
     polynomial = new QuadraticPolynomial(1n, baseOffset, N, []);
-    baseOffsets = packedDoubleArray(wheels0.length);
+    baseOffsets = new Float64Array(wheels0.length);
     // - Number(baseOffset % BigInt(pInBeta))
     for (let i = 0; i < wheels0.length; i += 1) {
       baseOffsets[i] = Number(baseOffset % BigInt(wheels0[i].step)) | 0;
@@ -756,7 +1281,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   function checkWheels(offset) {
     for (let k = 0; k < wheelsCount; k += 1) {
-      const p = heap32[wheelSteps + k] | 0;
+      const p = heap32[wheelSteps + k] & 134217727;
       for (let v = 0; v <= 1; v += 1) {
         const root = (v === 0 ? heap32[wheelRoots1 + k] : heap32[wheelRoots2 + k]);
         if (root !== sieveSize) {
@@ -771,6 +1296,79 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
 
+  /*
+ export function updateWheelsInternal(wheelsCount:i32, wheelSteps:i32, wheelRoots:i32, invCache:i32, BB:i32, BBlength:i32, offset:i32, wheelRoots1:i32, wheelRoots2:i32):i32 {
+    const offsetValue = f64x2.splat(f64(offset));
+    for (let i = 0; i < (wheelsCount << 2); i += 16) {
+      const pc = v128.and(v128.load(wheelSteps + i), i32x4.splat(134217727));
+      const rootc = v128.load(wheelRoots + i);
+      const invAc = v128.load(invCache + i);
+
+      const twoTo52 = i64x2.splat(0x4330000000000000); // 2**52
+      const mask = i64x2.splat(0x00000000FFFFFFFF); // 2**32 - 1
+
+      const p_even = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(pc, 0), mask)), twoTo52);
+      const p_odd = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(pc, 32), mask)), twoTo52);
+
+      const root_even = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(rootc, 0), mask)), twoTo52);
+      const root_odd = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(rootc, 32), mask)), twoTo52);
+
+      const invA_even = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(invAc, 0), mask)), twoTo52);
+      const invA_odd = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(invAc, 32), mask)), twoTo52);
+
+      //const b = Number(polynomial.B % BigInt(p));
+      const pInv_even = f64x2.div(i64x2.splat(0x3FF0000000000001), p_even); // (1 + 2**-52) / p
+      const pInv_odd = f64x2.div(i64x2.splat(0x3FF0000000000001), p_odd); // (1 + 2**-52) / p
+      //const b = -0 + FastMod(BB, p);
+
+      // FastMod(BB, p):
+      let j = (BBlength - 1) << 3;
+      let BBj = f64x2.splat(f64.load(BB + j));
+      let b_even = BBj;
+      let b_odd = BBj;
+      b_even = f64x2.sub(b_even, f64x2.mul(f64x2.floor(f64x2.mul(b_even, pInv_even)), p_even));
+      b_odd = f64x2.sub(b_odd, f64x2.mul(f64x2.floor(f64x2.mul(b_odd, pInv_odd)), p_odd));
+      if (j !== 0) {
+        let x_even = i64x2.splat(0x4320000000000000); // 2**51
+        let x_odd = i64x2.splat(0x4320000000000000); // 2**51
+        x_even = f64x2.sub(x_even, f64x2.mul(f64x2.floor(f64x2.mul(x_even, pInv_even)), p_even));
+        x_odd = f64x2.sub(x_odd, f64x2.mul(f64x2.floor(f64x2.mul(x_odd, pInv_odd)), p_odd));
+        do {
+          j -= 8;
+          BBj = f64x2.splat(f64.load(BB + j));
+          b_even = f64x2.add(f64x2.mul(b_even, x_even), BBj);
+          b_odd = f64x2.add(f64x2.mul(b_odd, x_odd), BBj);
+          b_even = f64x2.sub(b_even, f64x2.mul(f64x2.floor(f64x2.mul(b_even, pInv_even)), p_even));
+          b_odd = f64x2.sub(b_odd, f64x2.mul(f64x2.floor(f64x2.mul(b_odd, pInv_odd)), p_odd));
+        } while (j !== 0);
+      }
+
+      const e_even = f64x2.add(f64x2.sub(p_even, b_even), p_even);
+      const e_odd = f64x2.add(f64x2.sub(p_odd, b_odd), p_odd);
+      let x1_even = f64x2.sub(f64x2.mul(f64x2.add(e_even, root_even), invA_even), offsetValue);
+      let x1_odd = f64x2.sub(f64x2.mul(f64x2.add(e_odd, root_odd), invA_odd), offsetValue);
+      let x2_even = f64x2.sub(f64x2.mul(f64x2.sub(e_even, root_even), invA_even), offsetValue);
+      let x2_odd = f64x2.sub(f64x2.mul(f64x2.sub(e_odd, root_odd), invA_odd), offsetValue);
+      x1_even = f64x2.sub(x1_even, f64x2.mul(f64x2.floor(f64x2.mul(x1_even, pInv_even)), p_even)); // x1 mod p
+      x1_odd = f64x2.sub(x1_odd, f64x2.mul(f64x2.floor(f64x2.mul(x1_odd, pInv_odd)), p_odd)); // x1 mod p
+      x2_even = f64x2.sub(x2_even, f64x2.mul(f64x2.floor(f64x2.mul(x2_even, pInv_even)), p_even)); // x2 mod p
+      x2_odd = f64x2.sub(x2_odd, f64x2.mul(f64x2.floor(f64x2.mul(x2_odd, pInv_odd)), p_odd)); // x2 mod p
+
+      const x1c = v128.or(i64x2.shl(v128.and(f64x2.add(x1_even, twoTo52), mask), 0),
+                          i64x2.shl(v128.and(f64x2.add(x1_odd, twoTo52), mask), 32));
+      const x2c = v128.or(i64x2.shl(v128.and(f64x2.add(x2_even, twoTo52), mask), 0),
+                          i64x2.shl(v128.and(f64x2.add(x2_odd, twoTo52), mask), 32));
+
+      const r1 = i32x4.min_s(x1c, x2c);
+      const r2 = i32x4.max_s(x1c, x2c);
+
+      v128.store(wheelRoots1 + i, r1);
+      v128.store(wheelRoots2 + i, r2);
+    }
+    return 0;
+  };
+  */
+
   const updateWheels = function (polynomial, offset) {
     offset = -0 + offset;
     //recalculate roots based on the formula:
@@ -779,37 +1377,32 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const AA = FastModBigInt(polynomial.A);
     const BB = FastModBigInt(polynomial.B);
     const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
-    for (let i = 0; i < wheelsCount; i += 1) {
-      const p = -0 + (heap32[wheelSteps + i] | 0);
-      const root = -0 + wheelRoots[i];
-      if (!useCache) {
+    if (!useCache) {
+      zeroInvs.length = 0;
+      for (let i = 0; i < wheelsCount; i += 1) {
+        const p = -0 + (heap32[wheelSteps + i] & 134217727);
         //const a = Number(polynomial.A % BigInt(p));
         const a = -0 + FastMod(AA, p);
-        invCache[i] = -0 + modInverseSmall(a, p);
-      }
-      const invA = -0 + invCache[i];
-      //const b = Number(polynomial.B % BigInt(p));
-      const pInv = (1 + 2**-52) / p;
-      const b = -0 + FastMod(BB, p);
-      if (invA === 0) {
-        // single root:
-        // x = (2B)^-1*(-C) (mod p)
-        // skip as the performance is not better
-        heap32[wheelRoots1 + i] = sieveSize;
-        heap32[wheelRoots2 + i] = sieveSize;
-      } else {
-        const e = p - b + p;
-        let x1 = (e + root) * invA - offset;
-        let x2 = (e - root) * invA - offset;
-        x1 = x1 - Math.floor(x1 * pInv) * p;
-        x2 = x2 - Math.floor(x2 * pInv) * p;
-        const r1 = x1 | 0; // x1 mod p
-        const r2 = x2 | 0; // x2 mod p
-        const s = ((r1 - r2) & ((r1 - r2) >> 31));
-        heap32[wheelRoots1 + i] = r2 + s; // min(r1, r2)
-        heap32[wheelRoots2 + i] = r1 - s; // max(r1, r2)
+        const invA = modInverseSmall(a, p) | 0;
+        heap32[invCache + i] = invA;
+        if (invA === 0) {
+          zeroInvs.push(i);
+        }
       }
     }
+    for (let i = 0; i < BB.length; i += 1) {
+      f64array[BBoffset + i] = BB[i];
+    }
+    updateWheelsInternal(wheelsCount, wheelSteps << 2, wheelRoots << 2, invCache << 2, BBoffset << 3, BB.length, offset, wheelRoots1 << 2, wheelRoots2 << 2);
+    for (let j = 0; j < zeroInvs.length; j += 1) {
+      const i = zeroInvs[j];
+      // single root:
+      // x = (2B)^-1*(-C) (mod p)
+      // skip as the performance is not better
+      heap32[wheelRoots1 + i] = sieveSize;
+      heap32[wheelRoots2 + i] = sieveSize;
+    }
+    //...
     invCacheKey = polynomial.A;
     //checkWheels(offset);
   };
@@ -860,11 +1453,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     let cycleLength = 1;
     SIEVE_SEGMENT[0] = SHIFT;
     for (let j = 0; j < smallWheels; j += 1) {
-      const newCycleLength = +lcm(cycleLength, heap32[wheelSteps + j]);
+      const newCycleLength = +lcm(cycleLength, heap32[wheelSteps + j] & 134217727);
       copyCycle(SIEVE_SEGMENT, cycleLength, newCycleLength);
       cycleLength = newCycleLength;
-      const p = heap32[wheelSteps + j];
-      const log2p = heap8[wheelLogs + j];
+      const p = heap32[wheelSteps + j] & 134217727;
+      const log2p = heap32[wheelSteps + j] >>> 27;
       for (let k = ((heap32[wheelRoots1 + j] | 0) + newCycleLength - segmentStart % newCycleLength) % p; k < newCycleLength; k += p) {
         SIEVE_SEGMENT[k] = (SIEVE_SEGMENT[k] + log2p) | 0;
       }
@@ -883,9 +1476,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
       subsegmentEnd += S;
-      singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, wheelLogs, smallWheels * 4, smallWheels * 4 + V * 4, subsegmentEnd, 0);
+      singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, smallWheels * 4, smallWheels * 4 + V * 4, subsegmentEnd, 0);
     }
-    singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, wheelLogs, smallWheels * 4, wheelsCount * 4, segmentSize, segmentSize);
+    singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, smallWheels * 4, wheelsCount * 4, segmentSize, segmentSize);
   };
 
   const smoothEntries = [];
@@ -928,8 +1521,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   function checkFactorization(x) {
     let p = 0;
     for (let n = 0; n < wheelsCount; n += 1) {
-      const log2p = heap8[wheelLogs + n];
-      const step = heap32[wheelSteps + n];
+      const log2p = heap32[wheelSteps + n] >>> 27;
+      const step = heap32[wheelSteps + n] & 134217727;
       for (let v = 0; v <= 1; v += 1) {
         if ((x - (v === 0 ? (heap32[wheelRoots1 + n] | 0) : (heap32[wheelRoots2 + n] | 0)) - (n < smallWheels ? 0 : segmentSize)) % step === 0) {
           if (polynomial.AFactors.indexOf(step) === -1) {
@@ -944,15 +1537,17 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   function applyOffset(offset) {
     for (let j = 0; j < wheelsCount; j += 1) {
-      const step = heap32[wheelSteps + j];
-      let r1 = (0 + (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
+      const step = heap32[wheelSteps + j] & 134217727;
+      let r1 = (0 + (heap32[wheelRoots + j] | 0) - baseOffsets[j] - offset) % step;
       r1 += (r1 < 0 ? step : 0);
-      let r2 = (0 - (wheelRoots[j] | 0) - baseOffsets[j] - offset) % step;
+      let r2 = (0 - (heap32[wheelRoots + j] | 0) - baseOffsets[j] - offset) % step;
       r2 += (r2 < 0 ? step : 0);
       heap32[wheelRoots1 + j] = Math.min(r1, r2);
       heap32[wheelRoots2 + j] = Math.max(r1, r2);
     }
   }
+
+globalThis.countersx = [0, 0, 0, 0];
 
   const set = new Uint8Array((sieveSize >> (3 + 3)) + 1);
 //globalThis.countersFound = [0, 0];
@@ -960,15 +1555,12 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (typeof offset !== "number") {
       throw new TypeError();
     }
-    const smoothEntriesX = [];
+    const smoothEntriesX = new Float64Array(smoothEntries.length);
     for (let i = 0; i < smoothEntries.length; i += 1) {
-      smoothEntriesX.push(-0 + (smoothEntries[i] - offset));
+      smoothEntriesX[i] = -0 + (smoothEntries[i] - offset);
     }
     
-    const smoothEntries2A = [];
-    for (let i = 0; i < smoothEntriesX.length; i += 1) {
-      smoothEntries2A.push(-0);
-    }
+    const smoothEntries2A = new Float64Array(smoothEntries.length);
     for (let i = 0; i < set.length; i += 1) {
       set[i] = 0;
     }
@@ -977,37 +1569,51 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       set[hash >> 3] |= (1 << (hash & 7));
     }
     
+    const f1 = function (i, step, j, proot1, proot2) {
+      smoothEntries2A[i] += +wheelLogs0[j];
+      smoothEntries3[i].push(step);
+      if (proot1 === proot2) {
+        smoothEntries2A[i] += +wheelLogs0[j];
+        smoothEntries3[i].push(step);
+      }
+    };
+
+    for (let j = 0; j < smallWheels; j += 1) {
+      let proot1 = heap32[wheelRoots1 + j];
+      let proot2 = heap32[wheelRoots2 + j];
+      const step = heap32[wheelSteps + j] & 134217727;
+      for (let i = smoothEntriesX.length - 1; i >= 0; i -= 1) {
+        const x = smoothEntriesX[i] % step;
+        if (x === proot1 % step || x === proot2 % step) {
+          f1(i, step, j, proot1, proot2);
+        }
+      }
+    }
+
     //const T = Math.max(Math.ceil(sieveSize / smoothEntries.length * 1.5), wheelData[smallWheels * 4]);
     //A: step <= T
     // 512*3 - 3061
     // 768 - 3290
     // 1024 - 3295
-    const A = Math.max(smallWheels, Math.min(1024 * 2, Math.ceil(wheelsCount / 1)));
-    for (let j = 0; j < A; j += 1) {
+    const A = Math.max(smallWheels, Math.min(q > 1 ? 16 * 1024 : 1024 * 2, Math.ceil(wheelsCount / 1)));
+    for (let j = smallWheels; j < A; j += 1) {
       let proot1 = heap32[wheelRoots1 + j] | 0;
       let proot2 = heap32[wheelRoots2 + j] | 0;
-      const step = heap32[wheelSteps + j] | 0;
-      if (proot1 === 0 && proot2 === 0) {
-        if (j >= smallWheels) {
-          continue;
-        }
-      }
-      const s = (j < smallWheels ? 0 : sieveSize);
+      const step = heap32[wheelSteps + j] & 134217727;
       const step1 = -0 + step;
-      const stepInv = (1+2**-52) / step1;
-      const a = -0 + ((proot1 + s) % step);
-      const b = -0 + ((proot2 + s) % step);
+      const stepInv = (1 + 2**-52) / step1;
+      let a = -0 + (proot1 + sieveSize);
+      let b = -0 + (proot2 + sieveSize);
+      a = a - Math.floor(a * stepInv) * step1;
+      b = b - Math.floor(b * stepInv) * step1;
       for (let i = smoothEntriesX.length - 1; i >= 0; i -= 1) {
         //const x = (smoothEntriesX[i] % step) | 0;
         const e = smoothEntriesX[i];
         const x = e - Math.floor(e * stepInv) * step1;
-        if (x === a) {
-          smoothEntries2A[i] += +wheelLogs0[j];
-          smoothEntries3[i].push(step);
-        }
-        if (x === b) {
-          smoothEntries2A[i] += +wheelLogs0[j];
-          smoothEntries3[i].push(step);
+        if (x === a || x === b) {
+          if (proot1 !== 0 || proot2 !== 0) {
+            f1(i, step, j, proot1, proot2);
+          }
         }
       }
     }
@@ -1025,7 +1631,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     for (let j = A; j < wheelsCount; j += 1) {
       const proot1 = heap32[wheelRoots1 + j] | 0;
       const proot2 = heap32[wheelRoots2 + j] | 0;
-      const step = heap32[wheelSteps + j] | 0;
+      const step = heap32[wheelSteps + j] & 134217727;
       // "rotate" the wheel instead:
       let a = (proot1 + ((sieveSize - step) | 0)) | 0;
       let b = (proot2 + ((sieveSize - step) | 0)) | 0;
@@ -1324,6 +1930,9 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const solution = solutions.next([v, {c: c, v: v}]).value;
         if (true) {
           congruencesFound += 1;
+          if (congruencesFound === 150) {
+            //return 1n;
+          }
           const now = +Date.now();
           if (now - last > 5000 || solution != null) {
             console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
