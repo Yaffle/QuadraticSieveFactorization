@@ -1151,7 +1151,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const twoB = log2B + Math.min(8.5, log2B);
+  const twoB = log2B + Math.min(Math.log2(200), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -1245,7 +1245,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const lp = largePrimes.get(p);
     if (lp == undefined) {
       // storing polynomial + x has smaller memory usage
-      largePrimes.set(p, {polynomial: polynomial, x: x, pb: pb});
+      largePrimes.set(p, {polynomial: polynomial, x: x, pb: pb.slice(0)});
     } else {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
@@ -1510,8 +1510,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         }
         if (thresholdApproximation < SIEVE_SEGMENT[i]) {
           smoothEntries.push(i + offset);
-          smoothEntries2.push((SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
-          smoothEntries3.push([]);
+          smoothEntries2.push(-0 + (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
         }
         i += 1;
       }
@@ -1582,8 +1581,8 @@ globalThis.countersx = [0, 0, 0, 0];
       let proot1 = heap32[wheelRoots1 + j];
       let proot2 = heap32[wheelRoots2 + j];
       const step = heap32[wheelSteps + j] & 134217727;
-      for (let i = smoothEntriesX.length - 1; i >= 0; i -= 1) {
-        const x = smoothEntriesX[i] % step;
+      for (let i = smoothEntries.length - 1; i >= 0; i -= 1) {
+        const x = (smoothEntries[i] - offset) % step;
         if (x === proot1 % step || x === proot2 % step) {
           f1(i, step, j, proot1, proot2);
         }
@@ -1595,7 +1594,7 @@ globalThis.countersx = [0, 0, 0, 0];
     // 512*3 - 3061
     // 768 - 3290
     // 1024 - 3295
-    const A = Math.max(smallWheels, Math.min(q > 1 ? 16 * 1024 : 1024 * 2, Math.ceil(wheelsCount / 1)));
+    const A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 2 / smoothEntries.length), wheelsCount));
     for (let j = smallWheels; j < A; j += 1) {
       let proot1 = heap32[wheelRoots1 + j] | 0;
       let proot2 = heap32[wheelRoots2 + j] | 0;
@@ -1701,11 +1700,17 @@ globalThis.countersx = [0, 0, 0, 0];
 
           smoothEntries.length = 0;
           smoothEntries2.length = 0;
-          smoothEntries3.length = 0;
 
           for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
             updateSieveSegment(segmentStart);
             findSmoothEntries(offset + segmentStart, polynomial);
+          }
+          
+          while (smoothEntries3.length < smoothEntries2.length) {
+            smoothEntries3.push([]);
+          }
+          for (let i = 0; i < smoothEntries3.length; i += 1) {
+            smoothEntries3[i].length = 0;
           }
           
           findPreciseSmoothEntries(offset);
