@@ -1151,7 +1151,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const twoB = log2B + Math.min(Math.log2(200), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(200), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -1495,8 +1495,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      thresholdApproximation = Math.round((polynomial.log2AbsY(i + offset) - twoB) * SCALE + SHIFT) | 0;
-      const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + twoB, sieveSize) - offset);
+      thresholdApproximation = Math.floor((polynomial.log2AbsY(i + offset) - largePrimesThreshold) * SCALE + SHIFT + 0.5) | 0;
+      const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + largePrimesThreshold, sieveSize) - offset);
 
       while (i < j) {
         if (i < j - 1 && j + 3 < segmentSize) {
@@ -1733,7 +1733,7 @@ globalThis.countersx = [0, 0, 0, 0];
                 //console.log(threshold, value, checkFactorization(x - offset));
               }
             } else {
-              if (threshold - value < twoB) {
+              if (threshold - value < log2B + log2B) {
                 const p = exp2(threshold - value);
                 const c = lpStrategy(p, polynomial, x, smoothEntries3[i]);
                 if (c != null) {
@@ -1936,10 +1936,10 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const solution = solutions.next([v, {c: c, v: v}]).value;
         if (true) {
           congruencesFound += 1;
+          const now = +Date.now();
           if (congruencesFound === 150) {
             //return 1n;
           }
-          const now = +Date.now();
           if (now - last > 5000 || solution != null) {
             console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
                           'expected time: ', Math.round((now - start) / congruencesFound * primeBase.length),
