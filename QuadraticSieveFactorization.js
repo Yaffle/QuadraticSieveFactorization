@@ -1151,7 +1151,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const largePrimesThreshold = log2B + Math.min(Math.log2(300), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(200), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -1900,9 +1900,9 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   }
   // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
   // to limit memory usage during "solve" to 2GB:
-  const limit1 = Math.floor(2**23.6);
+  const limit1 = Math.floor(typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 2**23.5 : 2**24);
   const limit = Math.min(limit1, (1 << 25) - 1);
-  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**160 ? (Number(N) > 2**240 ? 13 : 8) : 6))), limit), 1024);
+  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / 7)), limit), 1024);
   const primesList = primes(B);
   let k = 1n;
   k = Number(N) > 2**64 ? BigInt(getBestMultiplier(N, primesList)) : 1n;
