@@ -1581,7 +1581,7 @@ globalThis.countersx = [0, 0, 0, 0];
       let proot1 = heap32[wheelRoots1 + j];
       let proot2 = heap32[wheelRoots2 + j];
       const step = heap32[wheelSteps + j] & 134217727;
-      for (let i = smoothEntries.length - 1; i >= 0; i -= 1) {
+      for (let i = 0; i < smoothEntries.length; i += 1) {
         const x = (smoothEntries[i] - offset) % step;
         if (x === proot1 % step || x === proot2 % step) {
           f1(i, step, j, proot1, proot2);
@@ -1605,7 +1605,7 @@ globalThis.countersx = [0, 0, 0, 0];
       let b = -0 + (proot2 + sieveSize);
       a = a - Math.floor(a * stepInv) * step1;
       b = b - Math.floor(b * stepInv) * step1;
-      for (let i = smoothEntriesX.length - 1; i >= 0; i -= 1) {
+      for (let i = 0; i < smoothEntriesX.length; i += 1) {
         //const x = (smoothEntriesX[i] % step) | 0;
         const e = smoothEntriesX[i];
         const x = e - Math.floor(e * stepInv) * step1;
