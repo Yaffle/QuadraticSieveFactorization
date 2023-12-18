@@ -1151,7 +1151,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const largePrimesThreshold = log2B + Math.min(Math.log2(200), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(300), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
