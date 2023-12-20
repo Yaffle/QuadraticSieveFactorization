@@ -1900,9 +1900,10 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   }
   // https://trizenx.blogspot.com/2018/10/continued-fraction-factorization-method.html#:~:text=optimal%20value :
   // to limit memory usage during "solve" to 2GB:
-  const limit1 = Math.floor(typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 2**23.5 : 2**24);
+  const limit1 = Math.floor(2**23.5);
   const limit = Math.min(limit1, (1 << 25) - 1);
-  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**240 ? 8 : 6))), limit), 1024);
+
+  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**240 ? 24 : 6))), limit), 1024);
   const primesList = primes(B);
   let k = 1n;
   k = Number(N) > 2**64 ? BigInt(getBestMultiplier(N, primesList)) : 1n;
