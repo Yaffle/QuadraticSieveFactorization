@@ -450,13 +450,342 @@ const wast = (strings) => String.raw({ raw: strings });
 
 const wastCode = wast`
 (module
+ (type $0 (func (param i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $type1 (func (param i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $type2 (func (param i32 i32) (result i32)))
  (type $type3 (func (param i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (import "env" "memory" (memory $0 0))
+ (export "findPreciseSmoothEntriesInternal" (func $findPreciseSmoothEntriesInternal))
  (export "singleBlockSieve" (func $singleBlockSieve))
  (export "findSmoothEntry" (func $findSmoothEntry))
  (export "updateWheelsInternal" (func $updateWheelsInternal))
+
+ (func $findPreciseSmoothEntriesInternal (param $0 i32) (param $1 i32) (param $2 i32) (param $3 i32) (param $4 i32) (param $5 i32) (param $6 i32) (param $7 i32) (result i32)
+  (local $8 i32)
+  (local $9 i32)
+  (local $10 i32)
+  (local $11 i32)
+  (local $12 i32)
+  (local $13 i32)
+  (local.set $0
+   (local.get $7)
+  )
+  (loop $for-loop|0
+   (if
+    (i32.lt_s
+     (local.get $1)
+     (local.get $2)
+    )
+    (block
+     (local.set $10
+      (i32.add
+       (local.tee $12
+        (i32.load
+         (i32.shl
+          (i32.add
+           (local.get $1)
+           (local.get $3)
+          )
+          (i32.const 2)
+         )
+        )
+       )
+       (local.tee $8
+        (i32.sub
+         (local.get $6)
+         (local.tee $9
+          (i32.and
+           (i32.load
+            (i32.shl
+             (i32.add
+              (local.get $1)
+              (local.get $5)
+             )
+             (i32.const 2)
+            )
+           )
+           (i32.const 134217727)
+          )
+         )
+        )
+       )
+      )
+     )
+     (local.set $8
+      (i32.add
+       (local.get $8)
+       (local.tee $13
+        (i32.load
+         (i32.shl
+          (i32.add
+           (local.get $1)
+           (local.get $4)
+          )
+          (i32.const 2)
+         )
+        )
+       )
+      )
+     )
+     (local.set $11
+      (i32.const 0)
+     )
+     (loop $do-loop|1
+      (local.set $11
+       (i32.or
+        (i32.load8_u
+         (i32.shr_s
+          (local.get $10)
+          (i32.const 6)
+         )
+        )
+        (i32.or
+         (local.get $11)
+         (i32.load8_u
+          (i32.shr_s
+           (local.get $8)
+           (i32.const 6)
+          )
+         )
+        )
+       )
+      )
+      (local.set $8
+       (i32.sub
+        (local.get $8)
+        (local.get $9)
+       )
+      )
+      (br_if $do-loop|1
+       (i32.ge_s
+        (local.tee $10
+         (i32.sub
+          (local.get $10)
+          (local.get $9)
+         )
+        )
+        (i32.const 0)
+       )
+      )
+     )
+     (if
+      (select
+       (i32.or
+        (local.get $11)
+        (i32.load8_u
+         (i32.shr_s
+          (i32.add
+           (i32.and
+            (i32.shr_s
+             (local.get $8)
+             (i32.const 31)
+            )
+            (local.get $9)
+           )
+           (local.get $8)
+          )
+          (i32.const 6)
+         )
+        )
+       )
+       (i32.const 0)
+       (select
+        (i32.const 1)
+        (local.get $13)
+        (local.get $12)
+       )
+      )
+      (block
+       (local.set $8
+        (i32.sub
+         (i32.add
+          (local.get $6)
+          (local.get $12)
+         )
+         (local.get $9)
+        )
+       )
+       (loop $while-continue|2
+        (if
+         (i32.ge_s
+          (local.get $8)
+          (i32.const 0)
+         )
+         (block
+          (if
+           (local.tee $10
+            (i32.load8_u
+             (i32.shr_s
+              (local.get $8)
+              (i32.const 6)
+             )
+            )
+           )
+           (if
+            (i32.and
+             (local.get $10)
+             (i32.shl
+              (i32.const 1)
+              (i32.and
+               (i32.shr_s
+                (local.get $8)
+                (i32.const 3)
+               )
+               (i32.const 7)
+              )
+             )
+            )
+            (block
+             (i32.store
+              (i32.shl
+               (local.get $0)
+               (i32.const 2)
+              )
+              (local.get $1)
+             )
+             (i32.store
+              (i32.shl
+               (i32.add
+                (local.get $0)
+                (i32.const 1)
+               )
+               (i32.const 2)
+              )
+              (local.get $9)
+             )
+             (i32.store
+              (i32.shl
+               (i32.add
+                (local.get $0)
+                (i32.const 2)
+               )
+               (i32.const 2)
+              )
+              (local.get $8)
+             )
+             (local.set $0
+              (i32.add
+               (local.get $0)
+               (i32.const 3)
+              )
+             )
+            )
+           )
+          )
+          (local.set $8
+           (i32.sub
+            (local.get $8)
+            (local.get $9)
+           )
+          )
+          (br $while-continue|2)
+         )
+        )
+       )
+       (local.set $8
+        (i32.sub
+         (i32.add
+          (local.get $6)
+          (local.get $13)
+         )
+         (local.get $9)
+        )
+       )
+       (loop $while-continue|3
+        (if
+         (i32.ge_s
+          (local.get $8)
+          (i32.const 0)
+         )
+         (block
+          (if
+           (local.tee $10
+            (i32.load8_u
+             (i32.shr_s
+              (local.get $8)
+              (i32.const 6)
+             )
+            )
+           )
+           (if
+            (i32.and
+             (local.get $10)
+             (i32.shl
+              (i32.const 1)
+              (i32.and
+               (i32.shr_s
+                (local.get $8)
+                (i32.const 3)
+               )
+               (i32.const 7)
+              )
+             )
+            )
+            (block
+             (i32.store
+              (i32.shl
+               (local.get $0)
+               (i32.const 2)
+              )
+              (local.get $1)
+             )
+             (i32.store
+              (i32.shl
+               (i32.add
+                (local.get $0)
+                (i32.const 1)
+               )
+               (i32.const 2)
+              )
+              (local.get $9)
+             )
+             (i32.store
+              (i32.shl
+               (i32.add
+                (local.get $0)
+                (i32.const 2)
+               )
+               (i32.const 2)
+              )
+              (local.get $8)
+             )
+             (local.set $0
+              (i32.add
+               (local.get $0)
+               (i32.const 3)
+              )
+             )
+            )
+           )
+          )
+          (local.set $8
+           (i32.sub
+            (local.get $8)
+            (local.get $9)
+           )
+          )
+          (br $while-continue|3)
+         )
+        )
+       )
+      )
+     )
+     (local.set $1
+      (i32.add
+       (local.get $1)
+       (i32.const 1)
+      )
+     )
+     (br $for-loop|0)
+    )
+   )
+  )
+  (i32.sub
+   (local.get $0)
+   (local.get $7)
+  )
+ )
+
  (func $singleBlockSieve (param $wheelRoots1 i32) (param $wheelRoots2 i32) (param $wheelSteps i32) (param $startWheel i32) (param $endWheel i32) (param $subsegmentEnd i32) (param $s i32) (result i32)
   (local $kpplusr i32)
   (local $kpplusr2 i32)
@@ -1208,6 +1537,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const wheelSteps = memorySize >> 2;
   memorySize += wheelsCount * 4;
 
+  const storage = memorySize >> 2;
+  memorySize += (16 * 1024) * 4;//TODO: what size to use?
+
   const wheelRoots = memorySize >> 2;
   memorySize += wheelsCount * 4;
   const invCache = memorySize >> 2;
@@ -1218,6 +1550,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   const bufferSize = nextValidHeapSize(memorySize);
   const exports = instantiate(bufferSize);
+  const findPreciseSmoothEntriesInternal = exports.findPreciseSmoothEntriesInternal;
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
   const updateWheelsInternal = exports.updateWheelsInternal;
@@ -1548,125 +1881,118 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
 globalThis.countersx = [0, 0, 0, 0];
 
-  const set = new Uint8Array((sieveSize >> (3 + 3)) + 1);
-//globalThis.countersFound = [0, 0];
-  const findPreciseSmoothEntries = function (offset) {
-    if (typeof offset !== "number") {
-      throw new TypeError();
-    }
+  function handleSmallWheels(smoothEntries2A, offset) {
     const smoothEntriesX = new Float64Array(smoothEntries.length);
     for (let i = 0; i < smoothEntries.length; i += 1) {
       smoothEntriesX[i] = -0 + (smoothEntries[i] - offset);
     }
-    
-    const smoothEntries2A = new Float64Array(smoothEntries.length);
-    for (let i = 0; i < set.length; i += 1) {
-      set[i] = 0;
-    }
-    for (let i = 0; i < smoothEntriesX.length; i += 1) {
-      const hash = smoothEntriesX[i] >> 3;
-      set[hash >> 3] |= (1 << (hash & 7));
-    }
-    
-    const f1 = function (i, step, j, proot1, proot2) {
-      smoothEntries2A[i] += +wheelLogs0[j];
-      smoothEntries3[i].push(step);
-      if (proot1 === proot2) {
-        smoothEntries2A[i] += +wheelLogs0[j];
-        smoothEntries3[i].push(step);
-      }
-    };
-
-    for (let j = 0; j < smallWheels; j += 1) {
-      let proot1 = heap32[wheelRoots1 + j];
-      let proot2 = heap32[wheelRoots2 + j];
-      const step = heap32[wheelSteps + j] & 134217727;
-      for (let i = 0; i < smoothEntries.length; i += 1) {
-        const x = (smoothEntries[i] - offset) % step;
-        if (x === proot1 % step || x === proot2 % step) {
-          f1(i, step, j, proot1, proot2);
-        }
-      }
-    }
-
-    //const T = Math.max(Math.ceil(sieveSize / smoothEntries.length * 1.5), wheelData[smallWheels * 4]);
-    //A: step <= T
-    // 512*3 - 3061
-    // 768 - 3290
-    // 1024 - 3295
-    const A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 2 / smoothEntries.length), wheelsCount));
-    for (let j = smallWheels; j < A; j += 1) {
+    const A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 1 / 2 / smoothEntries.length), wheelsCount));
+    for (let j = 0; j < A; j += 1) {
       let proot1 = heap32[wheelRoots1 + j] | 0;
       let proot2 = heap32[wheelRoots2 + j] | 0;
       const step = heap32[wheelSteps + j] & 134217727;
       const step1 = -0 + step;
       const stepInv = (1 + 2**-52) / step1;
-      let a = -0 + (proot1 + sieveSize);
-      let b = -0 + (proot2 + sieveSize);
+      //const stepInv = (1 + 2**-52) / step1;
+      let a = -0 + (proot1 + (j < smallWheels ? 0 : sieveSize));
+      let b = -0 + (proot2 + (j < smallWheels ? 0 : sieveSize));
       a = a - Math.floor(a * stepInv) * step1;
       b = b - Math.floor(b * stepInv) * step1;
-      for (let i = 0; i < smoothEntriesX.length; i += 1) {
-        //const x = (smoothEntriesX[i] % step) | 0;
-        const e = smoothEntriesX[i];
-        const x = e - Math.floor(e * stepInv) * step1;
-        if (x === a || x === b) {
-          if (proot1 !== 0 || proot2 !== 0) {
-            f1(i, step, j, proot1, proot2);
+      if (proot1 !== 0 || proot2 !== 0 || j < smallWheels) {
+        for (let i = 0; i < smoothEntriesX.length; i += 1) {
+          const e = smoothEntriesX[i];
+          const x = e - Math.floor(e * stepInv) * step1;
+          if (x === a || x === b) {
+            smoothEntries2A[i] += +wheelLogs0[j];
+            smoothEntries3[i].push(step);
+            if (proot1 === proot2) {
+              smoothEntries2A[i] += +wheelLogs0[j];
+              smoothEntries3[i].push(step);
+            }
           }
         }
       }
     }
-    const f = function (a, j, step) {
-      const ah = a >> 3;
-      if ((set[ah >> 3] & (1 << (ah & 7))) !== 0) {
-        const i = indexOf(smoothEntries, 0 + a + offset);
-        if (i !== -1) {
-          smoothEntries2A[i] += +wheelLogs0[j];
-          smoothEntries3[i].push(step);
-        }
-      }
-    };
-    //console.assert(wheels0.length > 0 && sieveSize >= wheels0[wheels0.length - 1].step);
+    return A;
+  };
+
+    
+  /*
+  export function findPreciseSmoothEntriesInternal(offset:i32, A:i32, wheelsCount:i32, wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, sieveSize:i32, storage:i32):i32 {
+    let k = storage;
     for (let j = A; j < wheelsCount; j += 1) {
-      const proot1 = heap32[wheelRoots1 + j] | 0;
-      const proot2 = heap32[wheelRoots2 + j] | 0;
-      const step = heap32[wheelSteps + j] & 134217727;
+      const proot1 = i32.load((wheelRoots1 + j) << 2);
+      const proot2 = i32.load((wheelRoots2 + j) << 2);
+      const step = i32.load((wheelSteps + j) << 2) & 134217727;
       // "rotate" the wheel instead:
       let a = (proot1 + ((sieveSize - step) | 0)) | 0;
       let b = (proot2 + ((sieveSize - step) | 0)) | 0;
       //if (b < a) throw new Error();
       let found = 0;
       do {
-        found = found | set[b >> 6] | set[a >> 6];
+        found = found | i32.load8_u(b >> 6) | i32.load8_u(a >> 6);
         a = (a - step) | 0;
         b = (b - step) | 0;
       } while (a >= 0);
-      //if (b >= 0) {
-      //  found = found | set[b >> 6];
-      //}
-
       b = (b + ((b >> 31) & step)) | 0;
-      found = found | set[b >> 6];
+      found = found | i32.load8_u(b >> 6);
 
       //if (b >= 0) throw new Error();
       //countersFound[found ? 1 : 0] += 1;
-      if (found) {
+      if (found !== 0) {
         if (proot1 !== 0 || proot2 !== 0) {
           let a = proot1 + sieveSize - step;
-          let b = proot2 + sieveSize - step;
           while (a >= 0) {
-            if (set[a >> 6]) {
-              f(a, j, step);
+            if (i32.load8_u(a >> 6) !== 0) {
+              if ((i32.load8_u(a >> 6) & (1 << ((a >> (6 - 3)) & 7))) !== 0) {
+                i32.store((k) << 2, j);
+                i32.store((k + 1) << 2, step);
+                i32.store((k + 2) << 2, a);
+                k += 3;
+              }
             }
             a = (a - step) | 0;
           }
+          let b = proot2 + sieveSize - step;
           while (b >= 0) {
-            if (set[b >> 6]) {
-              f(b, j, step);
+            if (i32.load8_u(b >> 6) !== 0) {
+              if ((i32.load8_u(b >> 6) & (1 << ((b >> (6 - 3)) & 7))) !== 0) {
+                i32.store((k) << 2, j);
+                i32.store((k + 1) << 2, step);
+                i32.store((k + 2) << 2, b);
+                k += 3;
+              }
             }
             b = (b - step) | 0;
           }
         }
+      }
+    }
+    return k - storage;
+  };
+  */
+
+  const set = new Uint8Array(arrayBuffer, 0, (sieveSize >> 6) + 1); // reusing sieve just to avoid some pointer arithmetic
+//globalThis.countersFound = [0, 0];
+  const findPreciseSmoothEntries = function (offset) {
+    const smoothEntries2A = new Float64Array(smoothEntries.length);
+    const A = handleSmallWheels(smoothEntries2A, offset);
+    for (let i = 0; i < set.length; i += 1) {
+      set[i] = 0;
+    }
+    for (let i = 0; i < smoothEntries.length; i += 1) {
+      const e = (smoothEntries[i] - offset);
+      set[e >> 6] |= (1 << ((e >> (6 - 3)) & 7));
+    }
+    const k = findPreciseSmoothEntriesInternal(offset, A, wheelsCount, wheelRoots1, wheelRoots2, wheelSteps, sieveSize, storage);
+    for (let v = 0; v < k; v += 3) {
+      const j = heap32[storage + v];
+      const step = heap32[storage + v + 1];
+      const a = heap32[storage + v + 2];
+      const i = indexOf(smoothEntries, 0 + a + offset);
+      if (i !== -1) {
+        smoothEntries2A[i] += +wheelLogs0[j];
+        smoothEntries3[i].push(step);
       }
     }
     for (let i = 0; i < smoothEntries2.length; i += 1) {
