@@ -454,12 +454,14 @@ const wastCode = wast`
  (type $0 (func (param i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $1 (func (param i32 i32 i32 i32 i32 i32 i32) (result i32)))
  (type $2 (func (param i32 i32) (result i32)))
- (type $3 (func (param i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
+ (type $3 (func (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 i32) (result i32)))
+ (type $4 (func (param i32 i32 i32 i32 i32 i32 i32 i32 i32 i32 f32) (result i32)))
  (import "env" "memory" (memory $0 0))
  (export "findPreciseSmoothEntriesInternal" (func $module/findPreciseSmoothEntriesInternal))
  (export "singleBlockSieve" (func $module/singleBlockSieve))
  (export "findSmoothEntry" (func $module/findSmoothEntry))
  (export "updateWheelsInternal" (func $module/updateWheelsInternal))
+ (export "handleSmallWheels" (func $module/handleSmallWheels))
  (func $module/findPreciseSmoothEntriesInternal (param $0 i32) (param $1 i32) (param $2 i32) (param $3 i32) (param $4 i32) (param $5 i32) (param $6 i32) (param $7 i32) (result i32)
   (local $8 i32)
   (local $9 i32)
@@ -477,7 +479,7 @@ const wastCode = wast`
      (local.get $2)
     )
     (block
-     (local.set $10
+     (local.set $9
       (i32.add
        (local.tee $12
         (i32.load
@@ -493,7 +495,7 @@ const wastCode = wast`
        (local.tee $8
         (i32.sub
          (local.get $6)
-         (local.tee $9
+         (local.tee $10
           (i32.and
            (i32.load
             (i32.shl
@@ -530,41 +532,45 @@ const wastCode = wast`
      (local.set $11
       (i32.const 0)
      )
-     (loop $do-loop|1
-      (local.set $11
-       (i32.or
-        (i32.load8_u
-         (i32.shr_s
-          (local.get $10)
-          (i32.const 6)
-         )
-        )
-        (i32.or
-         (local.get $11)
-         (i32.load8_u
-          (i32.shr_s
-           (local.get $8)
-           (i32.const 6)
+     (loop $while-continue|1
+      (if
+       (i32.ge_s
+        (local.get $9)
+        (i32.const 0)
+       )
+       (block
+        (local.set $11
+         (i32.or
+          (i32.load8_u
+           (i32.shr_s
+            (local.get $9)
+            (i32.const 6)
+           )
+          )
+          (i32.or
+           (local.get $11)
+           (i32.load8_u
+            (i32.shr_s
+             (local.get $8)
+             (i32.const 6)
+            )
+           )
           )
          )
         )
-       )
-      )
-      (local.set $8
-       (i32.sub
-        (local.get $8)
-        (local.get $9)
-       )
-      )
-      (br_if $do-loop|1
-       (i32.ge_s
-        (local.tee $10
+        (local.set $9
          (i32.sub
-          (local.get $10)
           (local.get $9)
+          (local.get $10)
          )
         )
-        (i32.const 0)
+        (local.set $8
+         (i32.sub
+          (local.get $8)
+          (local.get $10)
+         )
+        )
+        (br $while-continue|1)
        )
       )
      )
@@ -580,7 +586,7 @@ const wastCode = wast`
              (local.get $8)
              (i32.const 31)
             )
-            (local.get $9)
+            (local.get $10)
            )
            (local.get $8)
           )
@@ -602,7 +608,7 @@ const wastCode = wast`
           (local.get $6)
           (local.get $12)
          )
-         (local.get $9)
+         (local.get $10)
         )
        )
        (loop $while-continue|2
@@ -613,7 +619,7 @@ const wastCode = wast`
          )
          (block
           (if
-           (local.tee $10
+           (local.tee $9
             (i32.load8_u
              (i32.shr_s
               (local.get $8)
@@ -623,7 +629,7 @@ const wastCode = wast`
            )
            (if
             (i32.and
-             (local.get $10)
+             (local.get $9)
              (i32.shl
               (i32.const 1)
               (i32.and
@@ -651,22 +657,12 @@ const wastCode = wast`
                )
                (i32.const 2)
               )
-              (local.get $9)
-             )
-             (i32.store
-              (i32.shl
-               (i32.add
-                (local.get $0)
-                (i32.const 2)
-               )
-               (i32.const 2)
-              )
               (local.get $8)
              )
              (local.set $0
               (i32.add
                (local.get $0)
-               (i32.const 3)
+               (i32.const 2)
               )
              )
             )
@@ -675,7 +671,7 @@ const wastCode = wast`
           (local.set $8
            (i32.sub
             (local.get $8)
-            (local.get $9)
+            (local.get $10)
            )
           )
           (br $while-continue|2)
@@ -688,7 +684,7 @@ const wastCode = wast`
           (local.get $6)
           (local.get $13)
          )
-         (local.get $9)
+         (local.get $10)
         )
        )
        (loop $while-continue|3
@@ -699,7 +695,7 @@ const wastCode = wast`
          )
          (block
           (if
-           (local.tee $10
+           (local.tee $9
             (i32.load8_u
              (i32.shr_s
               (local.get $8)
@@ -709,7 +705,7 @@ const wastCode = wast`
            )
            (if
             (i32.and
-             (local.get $10)
+             (local.get $9)
              (i32.shl
               (i32.const 1)
               (i32.and
@@ -737,22 +733,12 @@ const wastCode = wast`
                )
                (i32.const 2)
               )
-              (local.get $9)
-             )
-             (i32.store
-              (i32.shl
-               (i32.add
-                (local.get $0)
-                (i32.const 2)
-               )
-               (i32.const 2)
-              )
               (local.get $8)
              )
              (local.set $0
               (i32.add
                (local.get $0)
-               (i32.const 3)
+               (i32.const 2)
               )
              )
             )
@@ -761,7 +747,7 @@ const wastCode = wast`
           (local.set $8
            (i32.sub
             (local.get $8)
-            (local.get $9)
+            (local.get $10)
            )
           )
           (br $while-continue|3)
@@ -973,11 +959,9 @@ const wastCode = wast`
   )
   (local.get $1)
  )
- (func $module/updateWheelsInternal (param $0 i32) (param $1 i32) (param $2 i32) (param $3 i32) (param $4 i32) (param $5 i32) (param $6 i32) (param $7 i32) (param $8 i32) (result i32)
-  (local $9 v128)
-  (local $10 v128)
-  (local $11 i32)
-  (local $12 v128)
+ (func $module/updateWheelsInternal (param $0 i32) (param $1 i32) (param $2 i32) (param $3 i32) (param $4 i32) (param $5 i32) (param $6 i32) (param $7 i32) (param $8 i32) (param $9 i32) (param $10 i32) (result i32)
+  (local $11 v128)
+  (local $12 i32)
   (local $13 v128)
   (local $14 v128)
   (local $15 v128)
@@ -989,7 +973,9 @@ const wastCode = wast`
   (local $21 v128)
   (local $22 v128)
   (local $23 v128)
-  (local.set $12
+  (local $24 v128)
+  (local $25 v128)
+  (local.set $14
    (f64x2.splat
     (f64.convert_i32_s
      (local.get $6)
@@ -999,24 +985,24 @@ const wastCode = wast`
   (loop $for-loop|0
    (if
     (i32.lt_s
-     (local.get $11)
+     (local.get $12)
      (i32.shl
       (local.get $0)
       (i32.const 2)
      )
     )
     (block
-     (local.set $14
+     (local.set $17
       (f64x2.sub
        (v128.or
         (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
         (v128.and
          (i64x2.shr_u
-          (local.tee $20
+          (local.tee $23
            (v128.load
             (i32.add
              (local.get $2)
-             (local.get $11)
+             (local.get $12)
             )
            )
           )
@@ -1028,17 +1014,17 @@ const wastCode = wast`
        (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
       )
      )
-     (local.set $15
+     (local.set $18
       (f64x2.sub
        (v128.or
         (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
         (v128.and
          (i64x2.shr_u
-          (local.tee $21
+          (local.tee $24
            (v128.load
             (i32.add
              (local.get $3)
-             (local.get $11)
+             (local.get $12)
             )
            )
           )
@@ -1050,9 +1036,9 @@ const wastCode = wast`
        (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
       )
      )
-     (local.set $10
+     (local.set $13
       (f64x2.sub
-       (local.tee $9
+       (local.tee $11
         (f64x2.splat
          (f64.load
           (i32.add
@@ -1073,117 +1059,121 @@ const wastCode = wast`
        (f64x2.mul
         (f64x2.floor
          (f64x2.mul
-          (local.get $9)
-          (local.tee $13
-           (f64x2.div
-            (v128.const i32x4 0x00000001 0x3ff00000 0x00000001 0x3ff00000)
-            (local.tee $16
-             (f64x2.sub
-              (v128.or
-               (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
-               (v128.and
-                (i64x2.shr_u
-                 (local.tee $17
-                  (v128.and
-                   (v128.load
-                    (i32.add
-                     (local.get $1)
-                     (local.get $11)
-                    )
-                   )
-                   (v128.const i32x4 0x07ffffff 0x07ffffff 0x07ffffff 0x07ffffff)
-                  )
-                 )
-                 (i32.const 0)
-                )
-                (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
-               )
-              )
-              (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
-             )
+          (local.get $11)
+          (local.tee $15
+           (v128.load
+            (i32.add
+             (local.get $9)
+             (local.get $12)
             )
            )
           )
          )
         )
-        (local.get $16)
+        (local.tee $19
+         (f64x2.sub
+          (v128.or
+           (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
+           (v128.and
+            (i64x2.shr_u
+             (local.tee $20
+              (v128.and
+               (v128.load
+                (i32.add
+                 (local.get $1)
+                 (local.get $12)
+                )
+               )
+               (v128.const i32x4 0x07ffffff 0x07ffffff 0x07ffffff 0x07ffffff)
+              )
+             )
+             (i32.const 0)
+            )
+            (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
+           )
+          )
+          (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
+         )
+        )
        )
       )
      )
-     (local.set $9
+     (local.set $11
       (f64x2.sub
-       (local.get $9)
+       (local.get $11)
        (f64x2.mul
         (f64x2.floor
          (f64x2.mul
-          (local.get $9)
-          (local.tee $22
-           (f64x2.div
-            (v128.const i32x4 0x00000001 0x3ff00000 0x00000001 0x3ff00000)
-            (local.tee $17
-             (f64x2.sub
-              (v128.or
-               (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
-               (v128.and
-                (i64x2.shr_u
-                 (local.get $17)
-                 (i32.const 32)
-                )
-                (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
-               )
-              )
-              (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
-             )
+          (local.get $11)
+          (local.tee $16
+           (v128.load
+            (i32.add
+             (local.get $10)
+             (local.get $12)
             )
            )
           )
          )
         )
-        (local.get $17)
+        (local.tee $20
+         (f64x2.sub
+          (v128.or
+           (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
+           (v128.and
+            (i64x2.shr_u
+             (local.get $20)
+             (i32.const 32)
+            )
+            (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
+           )
+          )
+          (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
+         )
+        )
        )
       )
      )
      (if
       (local.get $6)
       (block
-       (local.set $18
+       (local.set $21
         (f64x2.sub
          (v128.const i32x4 0x00000000 0x43200000 0x00000000 0x43200000)
          (f64x2.mul
           (f64x2.floor
            (f64x2.mul
             (v128.const i32x4 0x00000000 0x43200000 0x00000000 0x43200000)
-            (local.get $13)
+            (local.get $15)
            )
           )
-          (local.get $16)
+          (local.get $19)
          )
         )
        )
-       (local.set $23
+       (local.set $25
         (f64x2.sub
          (v128.const i32x4 0x00000000 0x43200000 0x00000000 0x43200000)
          (f64x2.mul
           (f64x2.floor
            (f64x2.mul
             (v128.const i32x4 0x00000000 0x43200000 0x00000000 0x43200000)
-            (local.get $22)
+            (local.get $16)
            )
           )
-          (local.get $17)
+          (local.get $20)
          )
         )
        )
        (loop $do-loop|1
-        (local.set $10
+        (local.set $13
          (f64x2.sub
-          (local.tee $10
+          (local.tee $13
            (f64x2.add
             (f64x2.mul
-             (local.get $10)
-             (local.get $18)
+             (local.get $13)
+             (local.get $21)
             )
-            (local.tee $19
+            (local.tee $22
              (f64x2.splat
               (f64.load
                (i32.add
@@ -1203,33 +1193,33 @@ const wastCode = wast`
           (f64x2.mul
            (f64x2.floor
             (f64x2.mul
-             (local.get $10)
              (local.get $13)
+             (local.get $15)
             )
            )
-           (local.get $16)
+           (local.get $19)
           )
          )
         )
-        (local.set $9
+        (local.set $11
          (f64x2.sub
-          (local.tee $9
+          (local.tee $11
            (f64x2.add
             (f64x2.mul
-             (local.get $9)
-             (local.get $23)
+             (local.get $11)
+             (local.get $25)
             )
-            (local.get $19)
+            (local.get $22)
            )
           )
           (f64x2.mul
            (f64x2.floor
             (f64x2.mul
-             (local.get $9)
-             (local.get $22)
+             (local.get $11)
+             (local.get $16)
             )
            )
-           (local.get $17)
+           (local.get $20)
           )
          )
         )
@@ -1242,43 +1232,43 @@ const wastCode = wast`
      (v128.store
       (i32.add
        (local.get $7)
-       (local.get $11)
+       (local.get $12)
       )
       (i32x4.min_s
-       (local.tee $20
+       (local.tee $23
         (v128.or
          (i64x2.shl
           (v128.and
            (f64x2.add
             (f64x2.sub
-             (local.tee $10
+             (local.tee $13
               (f64x2.sub
                (f64x2.mul
                 (f64x2.add
-                 (local.tee $18
+                 (local.tee $21
                   (f64x2.add
                    (f64x2.sub
-                    (local.get $16)
-                    (local.get $10)
+                    (local.get $19)
+                    (local.get $13)
                    )
-                   (local.get $16)
+                   (local.get $19)
                   )
                  )
-                 (local.get $14)
+                 (local.get $17)
                 )
-                (local.get $15)
+                (local.get $18)
                )
-               (local.get $12)
+               (local.get $14)
               )
              )
              (f64x2.mul
               (f64x2.floor
                (f64x2.mul
-                (local.get $10)
                 (local.get $13)
+                (local.get $15)
                )
               )
-              (local.get $16)
+              (local.get $19)
              )
             )
             (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
@@ -1291,26 +1281,26 @@ const wastCode = wast`
           (v128.and
            (f64x2.add
             (f64x2.sub
-             (local.tee $20
+             (local.tee $23
               (f64x2.sub
                (f64x2.mul
                 (f64x2.add
-                 (local.tee $19
+                 (local.tee $22
                   (f64x2.add
                    (f64x2.sub
-                    (local.get $17)
-                    (local.get $9)
+                    (local.get $20)
+                    (local.get $11)
                    )
-                   (local.get $17)
+                   (local.get $20)
                   )
                  )
-                 (local.tee $9
+                 (local.tee $11
                   (f64x2.sub
                    (v128.or
                     (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
                     (v128.and
                      (i64x2.shr_u
-                      (local.get $20)
+                      (local.get $23)
                       (i32.const 32)
                      )
                      (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
@@ -1320,13 +1310,13 @@ const wastCode = wast`
                   )
                  )
                 )
-                (local.tee $10
+                (local.tee $13
                  (f64x2.sub
                   (v128.or
                    (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
                    (v128.and
                     (i64x2.shr_u
-                     (local.get $21)
+                     (local.get $24)
                      (i32.const 32)
                     )
                     (v128.const i32x4 0xffffffff 0x00000000 0xffffffff 0x00000000)
@@ -1336,17 +1326,17 @@ const wastCode = wast`
                  )
                 )
                )
-               (local.get $12)
+               (local.get $14)
               )
              )
              (f64x2.mul
               (f64x2.floor
                (f64x2.mul
-                (local.get $20)
-                (local.get $22)
+                (local.get $23)
+                (local.get $16)
                )
               )
-              (local.get $17)
+              (local.get $20)
              )
             )
             (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
@@ -1357,32 +1347,32 @@ const wastCode = wast`
          )
         )
        )
-       (local.tee $9
+       (local.tee $11
         (v128.or
          (i64x2.shl
           (v128.and
            (f64x2.add
             (f64x2.sub
-             (local.tee $14
+             (local.tee $17
               (f64x2.sub
                (f64x2.mul
                 (f64x2.sub
-                 (local.get $18)
-                 (local.get $14)
+                 (local.get $21)
+                 (local.get $17)
                 )
-                (local.get $15)
+                (local.get $18)
                )
-               (local.get $12)
+               (local.get $14)
               )
              )
              (f64x2.mul
               (f64x2.floor
                (f64x2.mul
-                (local.get $14)
-                (local.get $13)
+                (local.get $17)
+                (local.get $15)
                )
               )
-              (local.get $16)
+              (local.get $19)
              )
             )
             (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
@@ -1395,26 +1385,26 @@ const wastCode = wast`
           (v128.and
            (f64x2.add
             (f64x2.sub
-             (local.tee $9
+             (local.tee $11
               (f64x2.sub
                (f64x2.mul
                 (f64x2.sub
-                 (local.get $19)
-                 (local.get $9)
+                 (local.get $22)
+                 (local.get $11)
                 )
-                (local.get $10)
+                (local.get $13)
                )
-               (local.get $12)
+               (local.get $14)
               )
              )
              (f64x2.mul
               (f64x2.floor
                (f64x2.mul
-                (local.get $9)
-                (local.get $22)
+                (local.get $11)
+                (local.get $16)
                )
               )
-              (local.get $17)
+              (local.get $20)
              )
             )
             (v128.const i32x4 0x00000000 0x43300000 0x00000000 0x43300000)
@@ -1430,16 +1420,16 @@ const wastCode = wast`
      (v128.store
       (i32.add
        (local.get $8)
-       (local.get $11)
+       (local.get $12)
       )
       (i32x4.max_s
-       (local.get $20)
-       (local.get $9)
+       (local.get $23)
+       (local.get $11)
       )
      )
-     (local.set $11
+     (local.set $12
       (i32.add
-       (local.get $11)
+       (local.get $12)
        (i32.const 16)
       )
      )
@@ -1449,9 +1439,364 @@ const wastCode = wast`
   )
   (i32.const 0)
  )
+ (func $module/handleSmallWheels (param $0 i32) (param $1 i32) (param $2 i32) (param $3 i32) (param $4 i32) (param $5 i32) (param $6 i32) (param $7 i32) (param $8 i32) (param $9 i32) (param $10 f32) (result i32)
+  (local $11 i32)
+  (local $12 i32)
+  (local $13 f32)
+  (local $14 v128)
+  (local $15 f32)
+  (local $16 f32)
+  (local $17 f32)
+  (local $18 v128)
+  (local $19 v128)
+  (local $20 v128)
+  (local $21 i32)
+  (local $22 i32)
+  (local $23 v128)
+  (local $24 f32)
+  (local $25 i32)
+  (local.set $2
+   (local.get $7)
+  )
+  (loop $for-loop|0
+   (if
+    (i32.gt_s
+     (local.get $1)
+     (local.get $25)
+    )
+    (block
+     (local.set $17
+      (f32.sub
+       (local.tee $13
+        (f32.convert_i32_s
+         (i32.add
+          (local.tee $11
+           (select
+            (local.get $6)
+            (i32.const 0)
+            (i32.le_s
+             (local.get $0)
+             (local.get $25)
+            )
+           )
+          )
+          (local.tee $22
+           (i32.load
+            (i32.shl
+             (i32.add
+              (local.get $3)
+              (local.get $25)
+             )
+             (i32.const 2)
+            )
+           )
+          )
+         )
+        )
+       )
+       (f32.mul
+        (f32.floor
+         (f32.mul
+          (local.get $13)
+          (local.tee $24
+           (f32.div
+            (local.get $10)
+            (local.tee $16
+             (f32.convert_i32_s
+              (i32.and
+               (i32.load
+                (i32.shl
+                 (i32.add
+                  (local.get $5)
+                  (local.get $25)
+                 )
+                 (i32.const 2)
+                )
+               )
+               (i32.const 134217727)
+              )
+             )
+            )
+           )
+          )
+         )
+        )
+        (local.get $16)
+       )
+      )
+     )
+     (local.set $18
+      (f32x4.splat
+       (local.tee $15
+        (f32.sub
+         (local.tee $13
+          (f32.convert_i32_s
+           (i32.add
+            (local.tee $21
+             (i32.load
+              (i32.shl
+               (i32.add
+                (local.get $4)
+                (local.get $25)
+               )
+               (i32.const 2)
+              )
+             )
+            )
+            (local.get $11)
+           )
+          )
+         )
+         (f32.mul
+          (f32.floor
+           (f32.mul
+            (local.get $13)
+            (local.get $24)
+           )
+          )
+          (local.get $16)
+         )
+        )
+       )
+      )
+     )
+     (if
+      (select
+       (i32.const 1)
+       (i32.gt_s
+        (local.get $0)
+        (local.get $25)
+       )
+       (select
+        (i32.const 1)
+        (local.get $21)
+        (local.get $22)
+       )
+      )
+      (block
+       (local.set $23
+        (f32x4.splat
+         (local.get $24)
+        )
+       )
+       (local.set $20
+        (f32x4.splat
+         (local.get $16)
+        )
+       )
+       (local.set $19
+        (f32x4.splat
+         (local.get $17)
+        )
+       )
+       (local.set $11
+        (i32.const 0)
+       )
+       (loop $for-loop|1
+        (if
+         (i32.gt_s
+          (local.get $9)
+          (local.get $11)
+         )
+         (block
+          (if
+           (i32.or
+            (i32x4.bitmask
+             (f32x4.eq
+              (local.tee $14
+               (f32x4.sub
+                (local.tee $14
+                 (v128.load
+                  (i32.shl
+                   (i32.add
+                    (local.get $8)
+                    (local.get $11)
+                   )
+                   (i32.const 2)
+                  )
+                 )
+                )
+                (f32x4.mul
+                 (f32x4.floor
+                  (f32x4.mul
+                   (local.get $14)
+                   (local.get $23)
+                  )
+                 )
+                 (local.get $20)
+                )
+               )
+              )
+              (local.get $19)
+             )
+            )
+            (i32x4.bitmask
+             (f32x4.eq
+              (local.get $14)
+              (local.get $18)
+             )
+            )
+           )
+           (block
+            (local.set $12
+             (local.get $11)
+            )
+            (loop $for-loop|2
+             (if
+              (i32.and
+               (i32.le_s
+                (local.get $12)
+                (i32.add
+                 (local.get $11)
+                 (i32.const 3)
+                )
+               )
+               (i32.gt_s
+                (local.get $9)
+                (local.get $12)
+               )
+              )
+              (block
+               (if
+                (i32.or
+                 (f32.eq
+                  (local.tee $13
+                   (f32.sub
+                    (local.tee $13
+                     (f32.load
+                      (i32.shl
+                       (i32.add
+                        (local.get $8)
+                        (local.get $12)
+                       )
+                       (i32.const 2)
+                      )
+                     )
+                    )
+                    (f32.mul
+                     (f32.floor
+                      (f32.mul
+                       (local.get $13)
+                       (local.get $24)
+                      )
+                     )
+                     (local.get $16)
+                    )
+                   )
+                  )
+                  (local.get $15)
+                 )
+                 (f32.eq
+                  (local.get $13)
+                  (local.get $17)
+                 )
+                )
+                (block
+                 (i32.store
+                  (i32.shl
+                   (local.get $2)
+                   (i32.const 2)
+                  )
+                  (local.get $25)
+                 )
+                 (i32.store
+                  (i32.shl
+                   (i32.add
+                    (local.get $2)
+                    (i32.const 1)
+                   )
+                   (i32.const 2)
+                  )
+                  (local.get $12)
+                 )
+                 (local.set $2
+                  (i32.add
+                   (local.get $2)
+                   (i32.const 2)
+                  )
+                 )
+                 (if
+                  (i32.eq
+                   (local.get $21)
+                   (local.get $22)
+                  )
+                   (block
+                    (i32.store
+                     (i32.shl
+                      (local.get $2)
+                      (i32.const 2)
+                     )
+                     (local.get $25)
+                    )
+                    (i32.store
+                     (i32.shl
+                      (i32.add
+                       (local.get $2)
+                       (i32.const 1)
+                      )
+                      (i32.const 2)
+                     )
+                     (local.get $12)
+                    )
+                  (local.set $2
+                    (i32.add
+                     (local.get $2)
+                     (i32.const 2)
+                    )
+                  )
+                   )
+                 )
+                )
+               )
+               (local.set $12
+                (i32.add
+                 (local.get $12)
+                 (i32.const 1)
+                )
+               )
+               (br $for-loop|2)
+              )
+             )
+            )
+           )
+          )
+          (local.set $11
+           (i32.add
+            (local.get $11)
+            (i32.const 4)
+           )
+          )
+          (br $for-loop|1)
+         )
+        )
+       )
+      )
+     )
+     (local.set $25
+      (i32.add
+       (local.get $25)
+       (i32.const 1)
+      )
+     )
+     (br $for-loop|0)
+    )
+   )
+  )
+  (i32.sub
+   (local.get $2)
+   (local.get $7)
+  )
+ )
 )
 
-`;
+`.replaceAll('f32x4.relaxed_fms', 'f32x4.relaxed_nmadd')
+ .replaceAll('i32x4.laneselect', 'i32x4.relaxed_laneselect')
+ .replace(/v128\.const i32x4 (0x[0-9a-z]+) (0x[0-9a-z]+) (0x[0-9a-z]+) (0x[0-9a-z]+)/g, function (p, a, b, c, d) {
+  if (a === b && b === c && c === d) {
+    return 'i32x4.splat (i32.const ' + a + ')';
+  }
+  return 'v128.const i32x4 ' + a + ' ' + b + ' ' + c + ' ' + d;
+});
 
 let wasmModule = null;
 function instantiateWasm(memorySize) {
@@ -1569,8 +1914,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const invCache = memorySize >> 2;
   memorySize += wheelsCount * 4;
   memorySize += memorySize % 8;
+  const stepInvsEven = memorySize >> 3;
+  memorySize += wheelsCount / 2 * 8;
+  const stepInvsOdd = memorySize >> 3;
+  memorySize += wheelsCount / 2 * 8;
   const BBoffset = memorySize >> 3;
   memorySize += 256 * 8;//?
+  const smoothEntriesX = memorySize >> 2;
+  memorySize += 512 * 4;//TODO: what size?
 
   const bufferSize = nextValidHeapSize(memorySize);
   const exports = instantiate(bufferSize);
@@ -1578,11 +1929,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
   const updateWheelsInternal = exports.updateWheelsInternal;
+  const handleSmallWheels = exports.handleSmallWheels;
 
   const arrayBuffer = exports.memory.buffer;
   const SIEVE_SEGMENT = new Uint8Array(arrayBuffer);
   const heap32 = new Int32Array(arrayBuffer);
   const f64array = new Float64Array(arrayBuffer);
+  const f32array = new Float32Array(arrayBuffer);
 
   for (let i = 0; i < wheelsCount; i += 1) {
     const w = wheels0[i];
@@ -1595,6 +1948,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     heap32[wheelSteps + i] = w.step | (log << 27);
     heap32[wheelRoots + i] = w.root;
     wheelLogs0[i] = wheelLog;
+    f64array[(i % 2 === 0 ? stepInvsEven : stepInvsOdd) + Math.floor(i / 2)] = (1.0 + 2**-52) / +w.step;
   }
 
   const lpStrategy = function (p, polynomial, x, pb) {
@@ -1645,7 +1999,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           const x = BigInt(+root + offset);
           const X = (polynomial.A * x + polynomial.B);
           const Y = X * X - N;
-          if (Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(p) !== 0n) {
+          if (root < 0 || root >= p || Y % polynomial.A !== 0n || (Y / polynomial.A) % BigInt(p) !== 0n) {
             throw new Error();
           }
         }
@@ -1666,11 +2020,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       let b = (proot2 + ((sieveSize - step) | 0)) | 0;
       //if (b < a) throw new Error();
       let found = 0;
-      do {
+      while (a >= 0) {
         found = found | i32.load8_u(b >> 6) | i32.load8_u(a >> 6);
         a = (a - step) | 0;
         b = (b - step) | 0;
-      } while (a >= 0);
+      }
       b = (b + ((b >> 31) & step)) | 0;
       found = found | i32.load8_u(b >> 6);
 
@@ -1683,9 +2037,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             if (i32.load8_u(a >> 6) !== 0) {
               if ((i32.load8_u(a >> 6) & (1 << ((a >> (6 - 3)) & 7))) !== 0) {
                 i32.store((k) << 2, j);
-                i32.store((k + 1) << 2, step);
-                i32.store((k + 2) << 2, a);
-                k += 3;
+                i32.store((k + 1) << 2, a);
+                k += 2;
               }
             }
             a = (a - step) | 0;
@@ -1695,9 +2048,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             if (i32.load8_u(b >> 6) !== 0) {
               if ((i32.load8_u(b >> 6) & (1 << ((b >> (6 - 3)) & 7))) !== 0) {
                 i32.store((k) << 2, j);
-                i32.store((k + 1) << 2, step);
-                i32.store((k + 2) << 2, b);
-                k += 3;
+                i32.store((k + 1) << 2, b);
+                k += 2;
               }
             }
             b = (b - step) | 0;
@@ -1741,7 +2093,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     return i;
   }
-  export function updateWheelsInternal(wheelsCount:i32, wheelSteps:i32, wheelRoots:i32, invCache:i32, BB:i32, BBlength:i32, offset:i32, wheelRoots1:i32, wheelRoots2:i32):i32 {
+  export function updateWheelsInternal(wheelsCount:i32, wheelSteps:i32, wheelRoots:i32, invCache:i32, BB:i32, BBlength:i32, offset:i32, wheelRoots1:i32, wheelRoots2:i32, stepInvsEven:i32, stepInvsOdd:i32):i32 {
     const offsetValue = f64x2.splat(f64(offset));
     for (let i = 0; i < (wheelsCount << 2); i += 16) {
       const pc = v128.and(v128.load(wheelSteps + i), i32x4.splat(134217727));
@@ -1761,8 +2113,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const invA_odd = f64x2.sub(v128.or(twoTo52, v128.and(i64x2.shr_u(invAc, 32), mask)), twoTo52);
 
       //const b = Number(polynomial.B % BigInt(p));
-      const pInv_even = f64x2.div(i64x2.splat(0x3FF0000000000001), p_even); // (1 + 2**-52) / p
-      const pInv_odd = f64x2.div(i64x2.splat(0x3FF0000000000001), p_odd); // (1 + 2**-52) / p
+      const pInv_even = v128.load(stepInvsEven + i); // (1 + 2**-52) / p
+      const pInv_odd = v128.load(stepInvsOdd + i); // (1 + 2**-52) / p
+
+      //const pInv_even = f64x2.div(i64x2.splat(0x3FF0000000000001), p_even); // (1 + 2**-52) / p
+      //const pInv_odd = f64x2.div(i64x2.splat(0x3FF0000000000001), p_odd); // (1 + 2**-52) / p
       //const b = -0 + FastMod(BB, p);
 
       // FastMod(BB, p):
@@ -1811,6 +2166,46 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     return 0;
   };
+  export function handleSmallWheels(smallWheels:i32, A:i32, wheelsCount:i32, wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, sieveSize:i32, storage:i32, smoothEntriesX:i32, smoothEntriesXCount:i32, one:f32):i32 {
+    let k = storage;
+    for (let j = 0; j < A; j += 1) {
+      const proot1 = i32.load((wheelRoots1 + j) << 2);
+      const proot2 = i32.load((wheelRoots2 + j) << 2);
+      const step = f32(i32.load((wheelSteps + j) << 2) & 134217727);
+      const stepInv = f32(one / step);
+      let a = f32(proot1 + (j < smallWheels ? 0 : sieveSize));
+      let b = f32(proot2 + (j < smallWheels ? 0 : sieveSize));
+      a = a - f32.floor(a * stepInv) * step;
+      b = b - f32.floor(b * stepInv) * step;
+      const stepInv2 = f32x4.splat(stepInv);
+      const step2 = f32x4.splat(step);
+      const a2 = f32x4.splat(a);
+      const b2 = f32x4.splat(b);
+      if (proot1 !== 0 || proot2 !== 0 || j < smallWheels) {
+        for (let i = 0; i < smoothEntriesXCount; i += 4) {
+          const e = v128.load((smoothEntriesX + i) << 2);
+          const x = f32x4.sub(e, f32x4.mul(f32x4.floor(f32x4.mul(e, stepInv2)), step2));
+          if (i32x4.bitmask(f32x4.eq(x, a2)) | i32x4.bitmask(f32x4.eq(x, b2))) {
+            for (let i1 = i; i1 <= i + 3 && i1 < smoothEntriesXCount; i1 += 1) {
+              const e = f32.load((smoothEntriesX + i1) << 2);
+              const x = e - f32.floor(e * stepInv) * step;
+              if (x === a || x === b) {
+                i32.store((k) << 2, j);
+                i32.store((k + 1) << 2, i1);
+                k += 2;
+                if (proot1 === proot2) {
+                  i32.store((k) << 2, j);
+                  i32.store((k + 1) << 2, i1);
+                  k += 2;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return k - storage;
+  };
   */
 
   const updateWheels = function (polynomial, offset) {
@@ -1837,7 +2232,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     for (let i = 0; i < BB.length; i += 1) {
       f64array[BBoffset + i] = BB[i];
     }
-    updateWheelsInternal(wheelsCount, wheelSteps << 2, wheelRoots << 2, invCache << 2, BBoffset << 3, BB.length, offset, wheelRoots1 << 2, wheelRoots2 << 2);
+    updateWheelsInternal(wheelsCount, wheelSteps << 2, wheelRoots << 2, invCache << 2, BBoffset << 3, BB.length, offset, wheelRoots1 << 2, wheelRoots2 << 2, stepInvsEven << 3, stepInvsOdd << 3);
     for (let j = 0; j < zeroInvs.length; j += 1) {
       const i = zeroInvs[j];
       // single root:
@@ -1865,7 +2260,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const getSmallWheels = function () {
     let p = 1;
     let i = 0;
-    while (i < wheels0.length && lcm(p, wheels0[i].step) <= segmentSize / 5) {
+    while (i < wheels0.length && lcm(p, wheels0[i].step) <= segmentSize / 4) {
       p = lcm(p, wheels0[i].step);
       i += 1;
     }
@@ -1915,8 +2310,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 1 : 1.5);
-    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**18 ? 2 : 1)));
-    const S = Math.floor(2**15 * m - V * 4);
+    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**16 ? 2 : 1)));
+    const S = (1 << 15);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
       subsegmentEnd += S;
@@ -1933,26 +2328,30 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (typeof offset !== "number") {
       throw new TypeError();
     }
+    
+    const commonThreshold = (Math.round((polynomial.log2AbsY(0) - largePrimesThreshold) * SCALE + SHIFT) | 0) - 9;
+
     let i = 0;
     let thresholdApproximation = 0;
     while (i < segmentSize) {
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      thresholdApproximation = Math.floor((polynomial.log2AbsY(i + offset) - largePrimesThreshold) * SCALE + SHIFT + 0.5) | 0;
-      const j = Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + largePrimesThreshold, sieveSize) - offset);
+      thresholdApproximation = useMultiplePolynomials ? commonThreshold : Math.floor((polynomial.log2AbsY(i + offset) - largePrimesThreshold) * SCALE + SHIFT + 0.5) | 0;
+      const j = useMultiplePolynomials ? segmentSize : Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + largePrimesThreshold, sieveSize) - offset);
 
       while (i < j) {
-        if (i < j - 1 && j + 3 < segmentSize) {
+        if (i < j - 1) {
           const tmp = SIEVE_SEGMENT[j - 1];
           SIEVE_SEGMENT[j - 1] = MAX;
           i = findSmoothEntry(thresholdApproximation, i);
-          while (thresholdApproximation >= SIEVE_SEGMENT[i]) {
+          while (thresholdApproximation > SIEVE_SEGMENT[i]) {
             i += 1;
           }
           SIEVE_SEGMENT[j - 1] = tmp;
         }
-        if (thresholdApproximation < SIEVE_SEGMENT[i]) {
+        const t = Math.round((polynomial.log2AbsY(i + offset) - largePrimesThreshold) * SCALE + SHIFT) | 0;
+        if (t <= SIEVE_SEGMENT[i]) {
           smoothEntries.push(i + offset);
           smoothEntries2.push(-0 + (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
         }
@@ -1992,65 +2391,37 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
 globalThis.countersx = [0, 0, 0, 0];
 
-  function handleSmallWheels(smoothEntries2A, offset) {
-    const smoothEntriesX = new Float64Array(smoothEntries.length);
-    for (let i = 0; i < smoothEntries.length; i += 1) {
-      smoothEntriesX[i] = -0 + (smoothEntries[i] - offset);
-    }
-    const A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 1 / 2 / smoothEntries.length), wheelsCount));
-    for (let j = 0; j < A; j += 1) {
-      let proot1 = heap32[wheelRoots1 + j] | 0;
-      let proot2 = heap32[wheelRoots2 + j] | 0;
-      const step = heap32[wheelSteps + j] & 134217727;
-      const step1 = -0 + step;
-      const stepInv = (1 + 2**-52) / step1;
-      //const stepInv = (1 + 2**-52) / step1;
-      let a = -0 + (proot1 + (j < smallWheels ? 0 : sieveSize));
-      let b = -0 + (proot2 + (j < smallWheels ? 0 : sieveSize));
-      a = a - Math.floor(a * stepInv) * step1;
-      b = b - Math.floor(b * stepInv) * step1;
-      if (proot1 !== 0 || proot2 !== 0 || j < smallWheels) {
-        for (let i = 0; i < smoothEntriesX.length; i += 1) {
-          const e = smoothEntriesX[i];
-          const x = e - Math.floor(e * stepInv) * step1;
-          if (x === a || x === b) {
-            smoothEntries2A[i] += +wheelLogs0[j];
-            smoothEntries3[i].push(step);
-            if (proot1 === proot2) {
-              smoothEntries2A[i] += +wheelLogs0[j];
-              smoothEntries3[i].push(step);
-            }
-          }
-        }
-      }
-    }
-    return A;
-  };
 
-    
-  /*
-  
-  */
 
   const set = new Uint8Array(arrayBuffer, 0, (sieveSize >> 6) + 1); // reusing sieve just to avoid some pointer arithmetic
 //globalThis.countersFound = [0, 0];
   const findPreciseSmoothEntries = function (offset) {
     const smoothEntries2A = new Float64Array(smoothEntries.length);
-    const A = handleSmallWheels(smoothEntries2A, offset);
-    for (let i = 0; i < set.length; i += 1) {
-      set[i] = 0;
+    if (smoothEntries.length > 512) {
+      throw new Error();//!!!
+    }
+    for (let i = 0; i < smoothEntries.length; i += 1) {
+      f32array[smoothEntriesX + i] = -0 + (smoothEntries[i] - offset);
+    }
+    for (let i = smoothEntries.length; i < smoothEntries.length + 3; i += 1) {
+      f32array[smoothEntriesX + i] = f32array[smoothEntriesX + (smoothEntries.length - 1)];
+    }
+    const A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 2 / smoothEntries.length), wheelsCount));
+    const k1 = handleSmallWheels(smallWheels, A, wheelsCount, wheelRoots1, wheelRoots2, wheelSteps, sieveSize, storage, smoothEntriesX, smoothEntries.length, 1.0 + 2.0**-23);
+    for (let i = 0; i < set.length; i += 4) {
+      heap32[i >> 2] = 0;
     }
     for (let i = 0; i < smoothEntries.length; i += 1) {
       const e = (smoothEntries[i] - offset);
       set[e >> 6] |= (1 << ((e >> (6 - 3)) & 7));
     }
-    const k = findPreciseSmoothEntriesInternal(offset, A, wheelsCount, wheelRoots1, wheelRoots2, wheelSteps, sieveSize, storage);
-    for (let v = 0; v < k; v += 3) {
+    const k = k1 + findPreciseSmoothEntriesInternal(offset, A, wheelsCount, wheelRoots1, wheelRoots2, wheelSteps, sieveSize, storage + k1);
+    for (let v = 0; v < k; v += 2) {
       const j = heap32[storage + v];
-      const step = heap32[storage + v + 1];
-      const a = heap32[storage + v + 2];
-      const i = indexOf(smoothEntries, 0 + a + offset);
+      const a = heap32[storage + v + 1];
+      const i = v < k1 ? a : indexOf(smoothEntries, 0 + a + offset);
       if (i !== -1) {
+        const step = heap32[wheelSteps + j] & (2**24 - 1);
         smoothEntries2A[i] += +wheelLogs0[j];
         smoothEntries3[i].push(step);
       }
@@ -2245,7 +2616,7 @@ function getBestMultiplier(n, primesList) {
   // https://ir.cwi.nl/pub/27839/27839.pdf
 
   // f (m, n) = --2 - + L g(p, mn) logp,
-  const scores = new Array(101).fill(0);
+  const scores = new Array(150).fill(0);
   for (let m = 1; m < scores.length; m += 1) {
     scores[m] = -Math.log(m) / 2;
   }
@@ -2277,6 +2648,9 @@ function getBestMultiplier(n, primesList) {
 
   //8.9848939430165
   //console.log('best: ', best, 'scores: ', scores);
+  if (best !== 1) {
+    console.debug('multiplier', best);
+  }
   return best;
 }
 
