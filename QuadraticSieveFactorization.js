@@ -776,90 +776,101 @@ const wastCode = wast`
   (local $8 i32)
   (local $9 i32)
   (local $10 i32)
-  (local $11 i32)
-  (local.set $8
-   (local.get $3)
+  (local.set $7
+   (i32.add
+    (local.get $0)
+    (local.get $3)
+   )
   )
-  (loop $for-loop|0
+  (local.set $8
+   (i32.add
+    (local.get $1)
+    (local.get $3)
+   )
+  )
+  (local.set $3
+   (i32.add
+    (local.get $2)
+    (local.get $3)
+   )
+  )
+  (local.set $9
+   (i32.add
+    (local.get $2)
+    (local.get $4)
+   )
+  )
+  (loop $while-continue|0
    (if
-    (i32.gt_s
-     (local.get $4)
-     (local.get $8)
+    (i32.ne
+     (local.get $3)
+     (local.get $9)
     )
     (block
-     (local.set $7
+     (local.set $1
       (i32.load
-       (i32.add
-        (local.get $0)
-        (local.get $8)
-       )
+       (local.get $7)
       )
      )
-     (local.set $3
+     (local.set $0
       (i32.load
-       (i32.add
-        (local.get $1)
-        (local.get $8)
-       )
+       (local.get $8)
       )
      )
-     (local.set $9
+     (local.set $2
       (i32.and
-       (local.tee $10
+       (local.tee $4
         (i32.load
-         (i32.add
-          (local.get $2)
-          (local.get $8)
-         )
+         (local.get $3)
         )
        )
        (i32.const 134217727)
       )
      )
-     (local.set $10
+     (local.set $4
       (i32.shr_u
-       (local.get $10)
+       (local.get $4)
        (i32.const 27)
       )
      )
      (loop $while-continue|1
       (if
        (i32.lt_s
-        (local.get $3)
+        (local.get $0)
         (local.get $5)
        )
        (block
-        (local.set $11
+        (local.set $10
          (i32.add
           (i32.load8_u
-           (local.get $3)
+           (local.get $0)
           )
-          (local.get $10)
+          (local.get $4)
          )
         )
         (i32.store8
-         (local.get $7)
+         (local.get $1)
          (i32.add
           (i32.load8_u
-           (local.get $7)
+           (local.get $1)
           )
-          (local.get $10)
+          (local.get $4)
          )
         )
         (i32.store8
-         (local.get $3)
-         (local.get $11)
+         (local.get $0)
+         (local.get $10)
         )
-        (local.set $7
+        (local.set $1
          (i32.add
-          (local.get $7)
-          (local.get $9)
+          (local.get $1)
+          (local.get $2)
          )
         )
-        (local.set $3
+        (local.set $0
          (i32.add
-          (local.get $3)
-          (local.get $9)
+          (local.get $0)
+          (local.get $2)
          )
         )
         (br $while-continue|1)
@@ -867,52 +878,52 @@ const wastCode = wast`
       )
      )
      (if
-      (i32.gt_s
+      (i32.lt_s
+       (local.get $1)
        (local.get $5)
-       (local.get $7)
       )
       (block
        (i32.store8
-        (local.get $7)
+        (local.get $1)
         (i32.add
          (i32.load8_u
-          (local.get $7)
+          (local.get $1)
          )
-         (local.get $10)
+         (local.get $4)
         )
        )
-       (local.set $9
+       (local.set $2
         (i32.add
-         (local.get $7)
-         (local.get $9)
+         (local.get $1)
+         (local.get $2)
         )
        )
-       (local.set $7
-        (local.get $3)
+       (local.set $1
+        (local.get $0)
        )
-       (local.set $3
-        (local.get $9)
+       (local.set $0
+        (local.get $2)
        )
       )
      )
      (i32.store
-      (i32.add
-       (local.get $0)
-       (local.get $8)
-      )
+      (local.get $7)
       (i32.sub
-       (local.get $7)
-       (local.get $6)
-      )
-     )
-     (i32.store
-      (i32.add
        (local.get $1)
-       (local.get $8)
-      )
-      (i32.sub
-       (local.get $3)
        (local.get $6)
+      )
+     )
+     (i32.store
+      (local.get $8)
+      (i32.sub
+       (local.get $0)
+       (local.get $6)
+      )
+     )
+     (local.set $7
+      (i32.add
+       (local.get $7)
+       (i32.const 4)
       )
      )
      (local.set $8
@@ -921,7 +932,13 @@ const wastCode = wast`
        (i32.const 4)
       )
      )
-     (br $for-loop|0)
+     (local.set $3
+      (i32.add
+       (local.get $3)
+       (i32.const 4)
+      )
+     )
+     (br $while-continue|0)
     )
    )
   )
@@ -1798,6 +1815,7 @@ const wastCode = wast`
   return 'v128.const i32x4 ' + a + ' ' + b + ' ' + c + ' ' + d;
 });
 
+
 let wasmModule = null;
 function instantiateWasm(memorySize) {
   if (wasmModule == null) {
@@ -2059,11 +2077,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     return k - storage;
   };
   export function singleBlockSieve(wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, startWheel:i32, endWheel:i32, subsegmentEnd:i32, s:i32):i32 {
-    for (let wheel = startWheel; wheel < endWheel; wheel += 4) {
-      let kpplusr = i32.load(wheelRoots1 + wheel);
-      let kpplusr2 = i32.load(wheelRoots2 + wheel);
-      const step = i32.load(wheelSteps + wheel) & 134217727;
-      const log2p = i32.load(wheelSteps + wheel) >>> 27;
+    let wr1 = wheelRoots1 + startWheel;
+    let wr2 = wheelRoots2 + startWheel;
+    let ws = wheelSteps + startWheel;
+    const end = wheelSteps + endWheel;
+    while (ws !== end) {
+      let kpplusr = i32.load(wr1);
+      let kpplusr2 = i32.load(wr2);
+      const step = i32.load(ws) & 134217727;
+      const log2p = i32.load(ws) >>> 27;
       while (kpplusr2 < subsegmentEnd) {
         const log = i32.load8_u(kpplusr) + log2p;
         const log2 = i32.load8_u(kpplusr2) + log2p;
@@ -2080,8 +2102,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         kpplusr = kpplusr2;
         kpplusr2 = tmp;
       }
-      i32.store(wheelRoots1 + wheel, kpplusr - s);
-      i32.store(wheelRoots2 + wheel, kpplusr2 - s);
+      i32.store(wr1, kpplusr - s);
+      i32.store(wr2, kpplusr2 - s);
+      wr1 += 4;
+      wr2 += 4;
+      ws += 4;
     }
     return 0;
   }
