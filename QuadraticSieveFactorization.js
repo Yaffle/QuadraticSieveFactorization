@@ -487,6 +487,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = 3 * 2**14;
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
+    if (Number(N) > 2**240) {
+      sieveSize1 >>= 1;
+    }
   }
   //console.debug('sieveSize1', Math.log2(sieveSize1));
   
