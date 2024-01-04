@@ -388,12 +388,14 @@ QuadraticPolynomial.generator = function (M, primes, N) {
           return this.next();
         }
         const A = q;
-        const Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 1);
+        let Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 1);
         for (let i = 0; i < Bs.length; i += 1) {
-          Bs[i] = Bs[i] < 0n ? A - Bs[i] : Bs[i];
+          Bs[i] = Bs[i] < 0n ? A + Bs[i] : Bs[i];
+          if (Bs[i] < 0n || Bs[i] >= A) throw new Error();
         }
+        Bs = Bs.filter(B => B % 2n === 1n);
         Bs.sort((a, b) => Number(BigInt(a) - BigInt(b)));
-        for (let i = 0; i < Bs.length / 2; i += 1) {
+        for (let i = 0; i < Bs.length; i += 1) {
           const B = Bs[i];
           polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes));
         }
@@ -1005,7 +1007,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 1 : 1.5);
-    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**16 ? 2 : 1)));
+    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (wheelsCount > 2**16 ? 4 : 1)));
     const S = (1 << 15);
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
@@ -1101,7 +1103,7 @@ globalThis.countersx = [0, 0, 0, 0];
     for (let i = smoothEntries.length; i < smoothEntries.length + 1; i += 1) {
       f64array[smoothEntriesX + i] = f64array[smoothEntriesX + (smoothEntries.length - 1)];
     }
-    let A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 1 / smoothEntries.length), wheelsCount));
+    let A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 1.5 / smoothEntries.length), wheelsCount));
     A += (4 - A % 4) % 4;
     for (let j = 0; j < smallWheels; j += 1) {
       const step = heap32[wheelSteps + j] & 134217727;
