@@ -1082,7 +1082,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 1 : 1.5);
     const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (N > 2**240 ? 4 : 1)));
-    const S = (1 << 15);
+    const S = Math.floor((1 << 15) * m);
     const t1 = performance.now();
     let subsegmentEnd = 0;
     while (subsegmentEnd + S <= segmentSize) {
