@@ -7,14 +7,17 @@ function modPowSmall(base, exponent, modulus) {
   while (exponent !== 0) {
     if (exponent % 2 === 0) {
       exponent /= 2;
-      base = (base * base) % modulus;
+      base = (base * base);
+      base = base - Math.floor(base / modulus) * modulus;
     } else {
       exponent -= 1;
-      accumulator = (accumulator * base) % modulus;
+      accumulator = (accumulator * base);
+      accumulator = accumulator - Math.floor(accumulator / modulus) * modulus;
     }
   }
   return accumulator;
 }
+
 
 //function legendre(a, p) {
 //  console.assert((p - 1) % 2 === 0);

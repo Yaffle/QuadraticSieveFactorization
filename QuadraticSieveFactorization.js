@@ -376,7 +376,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   // "... Contini [5] recommends minimizing the number of duplicate relations found by requiring that the sets {qi} differ by at least two primes ..."
   const elementPrimes = 2;
   const k = Math.max(elementPrimes, Math.ceil(e / Math.min(14.5, max1) / elementPrimes) * elementPrimes); // number of small primes
-  console.debug('k', k, max1);
+  console.debug('k: ', k, 'useQ2Form: ', useQ2Form);
   const p = nthRootApprox(S, k);
   let s = 0;
   const nextPrime = function () {
@@ -1267,34 +1267,35 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             const x = smoothEntries[i];
             const value = +smoothEntries2[i];
             const threshold = +polynomial.log2AbsY(x);
-            if (threshold - value < 1) {
+            if (threshold - value <= log2B) {
               const X = polynomial.X(x);
-              const Y = polynomial.Y(x, 1n, smoothEntries3[i]);
+              let Y = polynomial.Y(x, 1n, smoothEntries3[i]);
+              if (Y == null) {
+                // this may happen because of prime powers
+                // or primes used to make "polynomial.A"
+                Y = polynomial.Y(x, 1n, smoothEntries3[i].concat(zeroInvs.map(i => wheels0[i].step)));
+              }
               if (Y != null) {
                 i1 = i;
                 return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N), done: false};
               } else {
-                console.count('?');
+                // may happen when exp2(threshold - value) is a multiplier
+                console.count('wrong entry', exp2(threshold - value));
                 //console.log(threshold, value, checkFactorization(x - offset));
               }
-            } else {
-              if (threshold - value < 2 * log2B) {
-                const p = exp2(threshold - value);
-                if (threshold - value < log2B) {
-                  if (zeroInvs.map(i => wheels0[i].step).indexOf(p) === -1) {
-                    //TODO: FIX
-                    //console.debug("too small lp", p);
-                  }
-                }
-                const c = lpStrategy(p, polynomial, x, smoothEntries3[i]);
-                if (c != null) {
-                  i1 = i;
-                  QuadraticSieveFactorization.lpCounter += 1;
-                  return {value: c, done: false};
-                }
-              } else {
-                console.count('too big', (threshold - value) / log2B);
+            } else if (threshold - value < 2 * log2B) {
+              const p = exp2(threshold - value);
+              //if (!isProbablyPrime(p)) {
+                //console.debug('wrong large prime?', p);
+              //}
+              const c = lpStrategy(p, polynomial, x, smoothEntries3[i]);
+              if (c != null) {
+                i1 = i;
+                QuadraticSieveFactorization.lpCounter += 1;
+                return {value: c, done: false};
               }
+            } else {
+              console.count('too big', (threshold - value) / log2B);
             }
           }
         i1 = sieveSize;
