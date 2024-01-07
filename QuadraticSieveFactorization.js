@@ -219,13 +219,13 @@ function isQuadraticResidueModuloPrime(a, p) {
 function significand(a) {
   const e = Math.max(0, Number(bitLength(a)) - 1023);
   const s = Number(a >> BigInt(e));
-  return s / 2**Math.floor(Math.log2(s));
+  return s / 2**Math.floor(Math.log2(Math.abs(s)));
 }
 
 function exponent(a) {
   const e = Math.max(0, Number(bitLength(a)) - 1023);
   const s = Number(a >> BigInt(e));
-  return e + Math.floor(Math.log2(s));
+  return e + Math.floor(Math.log2(Math.abs(s)));
 }
 
 function log2(a) {
@@ -282,24 +282,24 @@ function FastModBigInt(a) {
     array.push(x);
     a >>= 51n;
   }
-  return array;
+  return new Float64Array(array);
 }
-function FastMod(array, integer) {
+function FastMod(array, m, mInv) { // mInv === (1 + 2**-52) / m
+  m = -0 + m;
+  mInv = -0 + mInv;
   const n = array.length - 1;
   let result = array[n];
-  const v = integer;
-  const inv = (1 + 2**-52) / v;
-  result = result - Math.floor(result * inv) * v;
+  result = result - Math.floor(result * mInv) * m;
   if (n > 0) {
-    const x = 2**51 - Math.floor(2**51 * inv) * v;
+    const x = 2**51 - Math.floor(2**51 * mInv) * m;
     let i = n;
     do {
       i -= 1;
       result = result * x + array[i];
-      result = result - Math.floor(result * inv) * v;
+      result = result - Math.floor(result * mInv) * m;
     } while (i !== 0);
   }
-  return result;
+  return -0 + result;
 }
 
 //squareRootModuloOddPrime(4865648, 9749, 2)  // huge size of p**e
@@ -416,11 +416,15 @@ QuadraticPolynomial.generator = function (M, primes, N) {
         const A = q;
         let Bs = squareRootsModuloOddPrimesProduct(N, qPrimes, 1);
         for (let i = 0; i < Bs.length; i += 1) {
-          Bs[i] = Bs[i] < 0n ? A + Bs[i] : Bs[i];
+          Bs[i] = Bs[i] < 0n ? Bs[i] + A : Bs[i];
           if (Bs[i] < 0n || Bs[i] >= A) throw new Error();
         }
-        Bs = Bs.filter(B => B % 2n !== 0n);
-        Bs.sort((a, b) => Number(BigInt(a) - BigInt(b)));
+        if (useQ2Form) {
+          Bs = Bs.map(B => B % 2n === 0n ? B - A : B);
+        }
+        Bs = Bs.slice(0, Bs.length / 2);
+        //DO NOT SORT!!!
+        //Bs.sort((a, b) => Number(BigInt(a) - BigInt(b)));
         for (let i = 0; i < Bs.length; i += 1) {
           const B = Bs[i];
           polynomials.push(new QuadraticPolynomial(A, B, N, qPrimes, useQ2Form));
@@ -475,8 +479,7 @@ function thresholdApproximationInterval(polynomial, x, threshold, sieveSize) {
 // https://www.youtube.com/watch?v=TvbQVj2tvgc
 // https://www.rieselprime.de/ziki/Self-initializing_quadratic_sieve
 
-// fma: (+13% faster)
-const wasmCode = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 59, 5, 96, 8, 127, 127, 127, 127, 127, 127, 127, 127, 1, 127, 96, 7, 127, 127, 127, 127, 127, 127, 127, 1, 127, 96, 2, 127, 127, 1, 127, 96, 11, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 1, 127, 96, 10, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 1, 127, 2, 15, 1, 3, 101, 110, 118, 6, 109, 101, 109, 111, 114, 121, 2, 0, 0, 3, 6, 5, 0, 1, 2, 3, 4, 7, 116, 5, 32, 102, 105, 110, 100, 80, 114, 101, 99, 105, 115, 101, 83, 109, 111, 111, 116, 104, 69, 110, 116, 114, 105, 101, 115, 73, 110, 116, 101, 114, 110, 97, 108, 0, 0, 16, 115, 105, 110, 103, 108, 101, 66, 108, 111, 99, 107, 83, 105, 101, 118, 101, 0, 1, 15, 102, 105, 110, 100, 83, 109, 111, 111, 116, 104, 69, 110, 116, 114, 121, 0, 2, 20, 117, 112, 100, 97, 116, 101, 87, 104, 101, 101, 108, 115, 73, 110, 116, 101, 114, 110, 97, 108, 0, 3, 17, 104, 97, 110, 100, 108, 101, 83, 109, 97, 108, 108, 87, 104, 101, 101, 108, 115, 0, 4, 10, 194, 19, 5, 237, 2, 1, 6, 127, 32, 7, 33, 0, 32, 1, 65, 2, 116, 33, 8, 3, 64, 32, 8, 32, 2, 65, 2, 116, 72, 4, 64, 32, 3, 32, 8, 106, 40, 2, 0, 34, 11, 32, 6, 106, 32, 5, 32, 8, 106, 40, 2, 0, 65, 255, 255, 255, 63, 113, 34, 13, 107, 33, 9, 32, 4, 32, 8, 106, 40, 2, 0, 34, 12, 32, 6, 106, 32, 13, 107, 33, 1, 65, 0, 33, 10, 3, 64, 32, 9, 65, 0, 78, 4, 64, 32, 9, 65, 6, 117, 45, 0, 0, 32, 10, 32, 1, 65, 6, 117, 45, 0, 0, 114, 114, 33, 10, 32, 9, 32, 13, 107, 33, 9, 32, 1, 32, 13, 107, 33, 1, 12, 1, 11, 11, 32, 10, 32, 1, 65, 31, 117, 32, 13, 113, 32, 1, 106, 65, 6, 117, 45, 0, 0, 114, 65, 0, 65, 1, 32, 12, 32, 11, 27, 27, 4, 64, 32, 6, 32, 11, 106, 32, 13, 107, 33, 1, 3, 64, 32, 1, 65, 0, 78, 4, 64, 32, 1, 65, 6, 117, 45, 0, 0, 34, 9, 4, 64, 32, 9, 65, 1, 32, 1, 65, 3, 117, 65, 7, 113, 116, 113, 4, 64, 32, 0, 65, 2, 116, 32, 8, 65, 2, 117, 54, 2, 0, 32, 0, 65, 1, 106, 65, 2, 116, 32, 1, 54, 2, 0, 32, 0, 65, 2, 106, 33, 0, 11, 11, 32, 1, 32, 13, 107, 33, 1, 12, 1, 11, 11, 32, 6, 32, 12, 106, 32, 13, 107, 33, 1, 3, 64, 32, 1, 65, 0, 78, 4, 64, 32, 1, 65, 6, 117, 45, 0, 0, 34, 9, 4, 64, 32, 9, 65, 1, 32, 1, 65, 3, 117, 65, 7, 113, 116, 113, 4, 64, 32, 0, 65, 2, 116, 32, 8, 65, 2, 117, 54, 2, 0, 32, 0, 65, 1, 106, 65, 2, 116, 32, 1, 54, 2, 0, 32, 0, 65, 2, 106, 33, 0, 11, 11, 32, 1, 32, 13, 107, 33, 1, 12, 1, 11, 11, 11, 32, 8, 65, 4, 106, 33, 8, 12, 1, 11, 11, 32, 0, 32, 7, 107, 11, 217, 1, 1, 4, 127, 32, 0, 32, 3, 106, 33, 7, 32, 1, 32, 3, 106, 33, 8, 32, 2, 32, 3, 106, 33, 3, 32, 2, 32, 4, 106, 33, 9, 3, 64, 32, 3, 32, 9, 71, 4, 64, 32, 7, 40, 2, 0, 33, 1, 32, 8, 40, 2, 0, 33, 0, 32, 3, 40, 2, 0, 34, 4, 65, 255, 255, 255, 63, 113, 33, 2, 32, 4, 65, 27, 118, 33, 4, 3, 64, 32, 0, 32, 5, 72, 4, 64, 32, 0, 45, 0, 0, 32, 4, 106, 33, 10, 32, 1, 32, 1, 45, 0, 0, 32, 4, 106, 58, 0, 0, 32, 0, 32, 10, 58, 0, 0, 32, 1, 32, 2, 106, 33, 1, 32, 0, 32, 2, 106, 33, 0, 12, 1, 11, 11, 32, 1, 32, 5, 72, 4, 64, 32, 1, 32, 1, 45, 0, 0, 32, 4, 106, 58, 0, 0, 32, 1, 32, 2, 106, 33, 2, 32, 0, 33, 1, 32, 2, 33, 0, 11, 32, 7, 32, 1, 32, 6, 107, 54, 2, 0, 32, 8, 32, 0, 32, 6, 107, 54, 2, 0, 32, 7, 65, 4, 106, 33, 7, 32, 8, 65, 4, 106, 33, 8, 32, 3, 65, 4, 106, 33, 3, 12, 1, 11, 11, 65, 0, 11, 40, 1, 1, 123, 32, 0, 253, 15, 33, 2, 3, 64, 32, 1, 253, 0, 4, 0, 32, 2, 253, 44, 253, 83, 69, 4, 64, 32, 1, 65, 16, 106, 33, 1, 12, 1, 11, 11, 32, 1, 11, 134, 8, 2, 14, 123, 1, 127, 32, 6, 183, 154, 253, 20, 33, 13, 3, 64, 32, 25, 32, 0, 65, 2, 116, 72, 4, 64, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 2, 32, 25, 106, 253, 0, 4, 0, 34, 22, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 33, 16, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 3, 32, 25, 106, 253, 0, 4, 0, 34, 23, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 33, 17, 32, 5, 65, 1, 107, 65, 3, 116, 34, 6, 32, 4, 106, 43, 3, 0, 253, 20, 34, 11, 32, 9, 32, 25, 106, 253, 0, 4, 0, 34, 14, 253, 242, 1, 253, 117, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 1, 32, 25, 106, 253, 0, 4, 0, 253, 12, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 253, 78, 34, 19, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 18, 32, 11, 253, 136, 2, 33, 12, 32, 11, 32, 10, 32, 25, 106, 253, 0, 4, 0, 34, 15, 253, 242, 1, 253, 117, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 19, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 19, 32, 11, 253, 136, 2, 33, 11, 32, 6, 4, 64, 253, 12, 0, 0, 0, 0, 0, 0, 32, 67, 0, 0, 0, 0, 0, 0, 32, 67, 32, 14, 253, 242, 1, 253, 117, 32, 18, 253, 12, 0, 0, 0, 0, 0, 0, 32, 67, 0, 0, 0, 0, 0, 0, 32, 67, 253, 136, 2, 33, 20, 253, 12, 0, 0, 0, 0, 0, 0, 32, 67, 0, 0, 0, 0, 0, 0, 32, 67, 32, 15, 253, 242, 1, 253, 117, 32, 19, 253, 12, 0, 0, 0, 0, 0, 0, 32, 67, 0, 0, 0, 0, 0, 0, 32, 67, 253, 136, 2, 33, 24, 3, 64, 32, 12, 32, 20, 32, 6, 65, 8, 107, 34, 6, 32, 4, 106, 43, 3, 0, 253, 20, 34, 21, 253, 135, 2, 34, 12, 32, 14, 253, 242, 1, 253, 117, 32, 18, 32, 12, 253, 136, 2, 33, 12, 32, 11, 32, 24, 32, 21, 253, 135, 2, 34, 11, 32, 15, 253, 242, 1, 253, 117, 32, 19, 32, 11, 253, 136, 2, 33, 11, 32, 6, 13, 0, 11, 11, 32, 7, 32, 25, 106, 32, 18, 32, 12, 253, 241, 1, 34, 20, 32, 18, 32, 16, 253, 241, 1, 253, 240, 1, 32, 17, 32, 13, 253, 135, 2, 34, 12, 32, 14, 253, 242, 1, 253, 117, 32, 18, 32, 12, 253, 136, 2, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 240, 1, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 81, 32, 19, 32, 11, 253, 241, 1, 34, 21, 32, 19, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 22, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 11, 253, 241, 1, 253, 240, 1, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 23, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 12, 32, 13, 253, 135, 2, 34, 22, 32, 15, 253, 242, 1, 253, 117, 32, 19, 32, 22, 253, 136, 2, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 240, 1, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 81, 65, 32, 253, 203, 1, 253, 80, 34, 22, 32, 20, 32, 16, 253, 240, 1, 32, 17, 32, 13, 253, 135, 2, 34, 16, 32, 14, 253, 242, 1, 253, 117, 32, 18, 32, 16, 253, 136, 2, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 240, 1, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 81, 32, 21, 32, 11, 253, 240, 1, 32, 12, 32, 13, 253, 135, 2, 34, 11, 32, 15, 253, 242, 1, 253, 117, 32, 19, 32, 11, 253, 136, 2, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 240, 1, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 81, 65, 32, 253, 203, 1, 253, 80, 34, 11, 253, 182, 1, 253, 11, 4, 0, 32, 8, 32, 25, 106, 32, 22, 32, 11, 253, 184, 1, 253, 11, 4, 0, 32, 25, 65, 16, 106, 33, 25, 12, 1, 11, 11, 65, 0, 11, 196, 6, 3, 9, 127, 10, 123, 2, 124, 32, 4, 183, 33, 30, 32, 5, 33, 10, 3, 64, 32, 13, 32, 0, 65, 2, 116, 72, 4, 64, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 1, 32, 13, 106, 253, 0, 4, 0, 34, 19, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 32, 30, 253, 20, 34, 25, 253, 240, 1, 34, 20, 32, 8, 32, 13, 106, 253, 0, 4, 0, 34, 24, 253, 242, 1, 253, 117, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 3, 32, 13, 106, 253, 0, 4, 0, 253, 12, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 253, 78, 34, 21, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 23, 32, 20, 253, 136, 2, 33, 20, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 19, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 32, 25, 253, 240, 1, 34, 19, 32, 9, 32, 13, 106, 253, 0, 4, 0, 34, 22, 253, 242, 1, 253, 117, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 21, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 34, 21, 32, 19, 253, 136, 2, 33, 19, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 2, 32, 13, 106, 253, 0, 4, 0, 34, 26, 253, 12, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 253, 78, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 32, 25, 253, 240, 1, 34, 27, 32, 24, 253, 242, 1, 253, 117, 32, 23, 32, 27, 253, 136, 2, 33, 27, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 32, 26, 65, 32, 253, 205, 1, 253, 80, 253, 12, 0, 0, 0, 0, 0, 0, 48, 67, 0, 0, 0, 0, 0, 0, 48, 67, 253, 241, 1, 32, 25, 253, 240, 1, 34, 25, 32, 22, 253, 242, 1, 253, 117, 32, 21, 32, 25, 253, 136, 2, 33, 25, 32, 6, 33, 11, 3, 64, 32, 7, 32, 11, 74, 4, 64, 32, 11, 43, 3, 0, 34, 29, 253, 20, 34, 26, 32, 24, 253, 242, 1, 253, 117, 32, 23, 32, 26, 253, 136, 2, 34, 28, 32, 20, 253, 71, 32, 26, 32, 22, 253, 242, 1, 253, 117, 32, 21, 32, 26, 253, 136, 2, 34, 26, 32, 19, 253, 71, 253, 80, 32, 28, 32, 27, 253, 71, 32, 26, 32, 25, 253, 71, 253, 80, 253, 80, 253, 83, 4, 64, 32, 29, 252, 2, 33, 17, 32, 13, 33, 12, 3, 64, 32, 12, 32, 0, 65, 2, 116, 72, 32, 12, 32, 13, 65, 16, 106, 72, 113, 4, 64, 32, 3, 32, 12, 106, 40, 2, 0, 65, 255, 255, 255, 63, 113, 33, 14, 65, 1, 32, 2, 32, 12, 106, 40, 2, 0, 34, 16, 32, 1, 32, 12, 106, 40, 2, 0, 34, 15, 27, 4, 64, 32, 17, 32, 4, 32, 15, 106, 107, 32, 14, 111, 4, 127, 32, 17, 32, 4, 32, 16, 106, 107, 32, 14, 111, 5, 65, 0, 11, 69, 4, 64, 32, 10, 65, 2, 116, 32, 12, 65, 2, 117, 34, 14, 54, 2, 0, 32, 10, 65, 1, 106, 65, 2, 116, 32, 11, 32, 6, 107, 65, 3, 117, 34, 18, 54, 2, 0, 32, 10, 65, 2, 106, 33, 10, 32, 15, 32, 16, 70, 4, 64, 32, 10, 65, 2, 116, 32, 14, 54, 2, 0, 32, 10, 65, 1, 106, 65, 2, 116, 32, 18, 54, 2, 0, 32, 10, 65, 2, 106, 33, 10, 11, 11, 11, 32, 12, 65, 4, 106, 33, 12, 12, 1, 11, 11, 11, 32, 11, 65, 8, 106, 33, 11, 12, 1, 11, 11, 32, 13, 65, 16, 106, 33, 13, 12, 1, 11, 11, 32, 10, 32, 5, 107, 11]);
+const wasmCode = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 40, 4, 96, 7, 127, 127, 127, 127, 127, 127, 127, 1, 127, 96, 2, 127, 127, 1, 127, 96, 6, 127, 127, 127, 127, 127, 127, 0, 96, 9, 127, 127, 127, 127, 127, 127, 127, 127, 127, 1, 127, 2, 15, 1, 3, 101, 110, 118, 6, 109, 101, 109, 111, 114, 121, 2, 0, 0, 3, 5, 4, 0, 1, 2, 3, 7, 85, 4, 16, 115, 105, 110, 103, 108, 101, 66, 108, 111, 99, 107, 83, 105, 101, 118, 101, 0, 0, 15, 102, 105, 110, 100, 83, 109, 111, 111, 116, 104, 69, 110, 116, 114, 121, 0, 1, 24, 117, 112, 100, 97, 116, 101, 87, 104, 101, 101, 108, 115, 73, 110, 116, 101, 114, 110, 97, 108, 78, 101, 120, 116, 0, 2, 17, 104, 97, 110, 100, 108, 101, 83, 109, 97, 108, 108, 87, 104, 101, 101, 108, 115, 0, 3, 10, 172, 6, 4, 217, 1, 1, 4, 127, 32, 0, 32, 3, 106, 33, 7, 32, 1, 32, 3, 106, 33, 8, 32, 2, 32, 3, 106, 33, 3, 32, 2, 32, 4, 106, 33, 9, 3, 64, 32, 3, 32, 9, 71, 4, 64, 32, 7, 40, 2, 0, 33, 1, 32, 8, 40, 2, 0, 33, 0, 32, 3, 40, 2, 0, 34, 4, 65, 255, 255, 255, 63, 113, 33, 2, 32, 4, 65, 27, 118, 33, 4, 3, 64, 32, 0, 32, 5, 72, 4, 64, 32, 0, 45, 0, 0, 32, 4, 106, 33, 10, 32, 1, 32, 1, 45, 0, 0, 32, 4, 106, 58, 0, 0, 32, 0, 32, 10, 58, 0, 0, 32, 1, 32, 2, 106, 33, 1, 32, 0, 32, 2, 106, 33, 0, 12, 1, 11, 11, 32, 1, 32, 5, 72, 4, 64, 32, 1, 32, 1, 45, 0, 0, 32, 4, 106, 58, 0, 0, 32, 1, 32, 2, 106, 33, 2, 32, 0, 33, 1, 32, 2, 33, 0, 11, 32, 7, 32, 1, 32, 6, 107, 54, 2, 0, 32, 8, 32, 0, 32, 6, 107, 54, 2, 0, 32, 7, 65, 4, 106, 33, 7, 32, 8, 65, 4, 106, 33, 8, 32, 3, 65, 4, 106, 33, 3, 12, 1, 11, 11, 65, 0, 11, 40, 1, 1, 123, 32, 0, 253, 15, 33, 2, 3, 64, 32, 1, 253, 0, 4, 0, 32, 2, 253, 44, 253, 83, 69, 4, 64, 32, 1, 65, 16, 106, 33, 1, 12, 1, 11, 11, 32, 1, 11, 208, 1, 2, 4, 123, 2, 127, 3, 64, 32, 10, 32, 0, 65, 2, 116, 72, 4, 64, 32, 3, 32, 10, 106, 34, 11, 253, 0, 4, 0, 32, 1, 32, 10, 106, 253, 0, 4, 0, 32, 5, 253, 17, 253, 177, 1, 34, 7, 253, 177, 1, 34, 8, 32, 2, 32, 10, 106, 253, 0, 4, 0, 253, 12, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 255, 255, 255, 7, 253, 78, 34, 6, 253, 177, 1, 34, 9, 32, 8, 65, 31, 253, 172, 1, 32, 6, 253, 78, 253, 174, 1, 32, 9, 65, 31, 253, 172, 1, 32, 6, 253, 78, 253, 174, 1, 33, 8, 32, 11, 32, 8, 32, 4, 32, 10, 106, 34, 11, 253, 0, 4, 0, 32, 7, 253, 177, 1, 34, 7, 32, 6, 253, 177, 1, 34, 9, 32, 7, 65, 31, 253, 172, 1, 32, 6, 253, 78, 253, 174, 1, 32, 9, 65, 31, 253, 172, 1, 32, 6, 253, 78, 253, 174, 1, 34, 6, 253, 182, 1, 253, 11, 4, 0, 32, 11, 32, 8, 32, 6, 253, 184, 1, 253, 11, 4, 0, 32, 10, 65, 16, 106, 33, 10, 12, 1, 11, 11, 11, 211, 2, 2, 9, 127, 5, 123, 32, 6, 33, 9, 3, 64, 32, 10, 32, 0, 65, 2, 116, 72, 4, 64, 32, 1, 32, 10, 106, 253, 0, 4, 0, 33, 20, 32, 2, 32, 10, 106, 253, 0, 4, 0, 33, 21, 32, 4, 32, 10, 106, 253, 0, 4, 0, 33, 18, 32, 5, 32, 10, 106, 253, 0, 4, 0, 33, 19, 32, 7, 33, 12, 3, 64, 32, 8, 32, 12, 74, 4, 64, 32, 18, 32, 20, 32, 12, 40, 2, 0, 34, 13, 253, 17, 34, 22, 253, 177, 1, 253, 181, 1, 32, 19, 253, 62, 32, 18, 32, 21, 32, 22, 253, 177, 1, 253, 181, 1, 32, 19, 253, 62, 253, 80, 253, 83, 4, 64, 32, 10, 33, 11, 3, 64, 32, 11, 32, 0, 65, 2, 116, 72, 32, 11, 32, 10, 65, 16, 106, 72, 113, 4, 64, 32, 3, 32, 11, 106, 40, 2, 0, 65, 255, 255, 255, 63, 113, 33, 16, 65, 1, 32, 2, 32, 11, 106, 40, 2, 0, 34, 14, 32, 1, 32, 11, 106, 40, 2, 0, 34, 15, 27, 4, 64, 32, 15, 32, 13, 107, 32, 16, 111, 4, 127, 32, 14, 32, 13, 107, 32, 16, 111, 5, 65, 0, 11, 69, 4, 64, 32, 9, 65, 2, 116, 32, 11, 65, 2, 117, 34, 16, 54, 2, 0, 32, 9, 65, 1, 106, 65, 2, 116, 32, 12, 32, 7, 107, 65, 2, 117, 34, 17, 54, 2, 0, 32, 9, 65, 2, 106, 33, 9, 32, 14, 32, 15, 70, 4, 64, 32, 9, 65, 2, 116, 32, 16, 54, 2, 0, 32, 9, 65, 1, 106, 65, 2, 116, 32, 17, 54, 2, 0, 32, 9, 65, 2, 106, 33, 9, 11, 11, 11, 32, 11, 65, 4, 106, 33, 11, 12, 1, 11, 11, 11, 32, 12, 65, 4, 106, 33, 12, 12, 1, 11, 11, 32, 10, 65, 16, 106, 33, 10, 12, 1, 11, 11, 32, 9, 32, 6, 107, 11]);
 
 let wasmModule = null;
 function instantiateWasm(memorySize) {
@@ -517,7 +520,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
     if (Number(N) > 2**240) {
-      sieveSize1 >>= 1;
+      sieveSize1 = Math.floor(sieveSize1 / 3.2);
+    } else {
+      sieveSize1 = Math.floor(sieveSize1 / 1.5);
     }
   }
 
@@ -597,28 +602,28 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   memorySize += wheelsCount * 4;
   const invCache = memorySize >> 2;
   memorySize += wheelsCount * 4;
-  memorySize += memorySize % 8;
-  const stepInvsEven = memorySize >> 3;
-  memorySize += wheelsCount / 2 * 8;
-  const stepInvsOdd = memorySize >> 3;
-  memorySize += wheelsCount / 2 * 8;
-  const BBoffset = memorySize >> 3;
-  memorySize += 256 * 8;//?
-  const smoothEntriesX = memorySize >> 3;
+  const smoothEntriesX = memorySize >> 2;
   memorySize += 512 * 4;//TODO: what size?
+
+  const alpha = memorySize >> 2;
+  memorySize += 60 * wheelsCount * 4; //TODO: what size to use?
+  
+  const divTestA = memorySize >> 2;
+  memorySize += wheelsCount * 4;
+  const divTestB = memorySize >> 2;
+  memorySize += wheelsCount * 4;
 
   const bufferSize = nextValidHeapSize(memorySize);
   const exports = instantiate(bufferSize);
-  const findPreciseSmoothEntriesInternal = exports.findPreciseSmoothEntriesInternal;
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
-  const updateWheelsInternal = exports.updateWheelsInternal;
+  const updateWheelsInternalNext = exports.updateWheelsInternalNext;
+  const fillAlpha = exports.fillAlpha;
   const handleSmallWheels = exports.handleSmallWheels;
 
   const arrayBuffer = exports.memory.buffer;
   const SIEVE_SEGMENT = new Uint8Array(arrayBuffer);
   const heap32 = new Int32Array(arrayBuffer);
-  const f64array = new Float64Array(arrayBuffer);
 
   for (let i = 0; i < wheelsCount; i += 1) {
     const w = wheels0[i];
@@ -631,7 +636,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     heap32[wheelSteps + i] = w.step | (log << 27);
     heap32[wheelRoots + i] = w.root;
     wheelLogs0[i] = wheelLog;
-    f64array[(i % 2 === 0 ? stepInvsEven : stepInvsOdd) + Math.floor(i / 2)] = (1.0 + 2**-52) / +w.step;
   }
 
   const lpStrategy = function (p, polynomial, x, pb) {
@@ -694,57 +698,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   /*
 
-  export function findPreciseSmoothEntriesInternal(offset:i32, A:i32, wheelsCount:i32, wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, sieveSize:i32, storage:i32):i32 {
-    let k = storage;
-    for (let j = (A << 2); j < (wheelsCount << 2); j += 4) {
-      const proot1 = i32.load(wheelRoots1 + j);
-      const proot2 = i32.load(wheelRoots2 + j);
-      const step = i32.load(wheelSteps + j) & 134217727;
-      // "rotate" the wheel instead:
-      let a = proot1 + sieveSize - step;
-      let b = proot2 + sieveSize - step;
-      //if (b < a) throw new Error();
-
-      let found = 0;
-      while (a >= 0) {
-        found = found | i32.load8_u(b >> 6) | i32.load8_u(a >> 6);
-        a = (a - step) | 0;
-        b = (b - step) | 0;
-      }
-      b = (b + ((b >> 31) & step)) | 0;
-      found = found | i32.load8_u(b >> 6);
-
-      //if (b >= 0) throw new Error();
-      //countersFound[found ? 1 : 0] += 1;
-      if (found !== 0) {
-        if (proot1 !== 0 || proot2 !== 0) {
-          let a = proot1 + sieveSize - step;
-          while (a >= 0) {
-            if (i32.load8_u(a >> 6) !== 0) {
-              if ((i32.load8_u(a >> 6) & (1 << ((a >> (6 - 3)) & 7))) !== 0) {
-                i32.store((k) << 2, j >> 2);
-                i32.store((k + 1) << 2, a);
-                k += 2;
-              }
-            }
-            a = (a - step) | 0;
-          }
-          let b = proot2 + sieveSize - step;
-          while (b >= 0) {
-            if (i32.load8_u(b >> 6) !== 0) {
-              if ((i32.load8_u(b >> 6) & (1 << ((b >> (6 - 3)) & 7))) !== 0) {
-                i32.store((k) << 2, j >> 2);
-                i32.store((k + 1) << 2, b);
-                k += 2;
-              }
-            }
-            b = (b - step) | 0;
-          }
-        }
-      }
-    }
-    return k - storage;
-  };
   export function singleBlockSieve(wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, startWheel:i32, endWheel:i32, subsegmentEnd:i32, s:i32):i32 {
     let wr1 = wheelRoots1 + startWheel;
     let wr2 = wheelRoots2 + startWheel;
@@ -786,144 +739,50 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     return i;
   }
-  function i32x4_to_f64x2(x:v128):v128 {
-    const twoTo52 = i64x2.splat(0x4330000000000000); // 2**52
-    return f64x2.sub(v128.or(twoTo52, x), twoTo52);
-  }
-  function f64x2_to_i32x4(x:v128):v128 {
-    const twoTo52 = i64x2.splat(0x4330000000000000); // 2**52
-    return v128.xor(f64x2.add(x, twoTo52), twoTo52);
-  }
-  function madd(a:v128, b:v128, c:v128):v128 {
-    return f64x2.relaxed_madd(a, b, c);
-    //return f64x2.add(f64x2.mul(a, b), c);
-  }
-  function mod(x:v128, m:v128, mInv:v128):v128 {
-    return f64x2.relaxed_nmadd(f64x2.floor(f64x2.mul(x, mInv)), m, x);
-    //return f64x2.sub(x, f64x2.mul(f64x2.floor(f64x2.mul(x, mInv)), m));
-  }
-  export function updateWheelsInternal(wheelsCount:i32, wheelSteps:i32, wheelRoots:i32, invCache:i32, BB:i32, BBlength:i32, offset:i32, wheelRoots1:i32, wheelRoots2:i32, stepInvsEven:i32, stepInvsOdd:i32):i32 {
-    const offsetValue = f64x2.splat(-f64(offset));
+  export function updateWheelsInternalNext(wheelsCount:i32, alphav:i32, wheelSteps:i32, wheelRoots1:i32, wheelRoots2:i32, e:i32):void {
     for (let i = 0; i < (wheelsCount << 2); i += 16) {
-      const pc = v128.and(v128.load(wheelSteps + i), i32x4.splat(134217727));
-      const rootc = v128.load(wheelRoots + i);
-      const invAc = v128.load(invCache + i);
-
-      const mask = i64x2.splat(0x00000000FFFFFFFF); // 2**32 - 1
-
-      const p_even = i32x4_to_f64x2(v128.and(pc, mask));
-      const p_odd = i32x4_to_f64x2(i64x2.shr_u(pc, 32));
-
-      const root_even = i32x4_to_f64x2(v128.and(rootc, mask));
-      const root_odd = i32x4_to_f64x2(i64x2.shr_u(rootc, 32));
-
-      const invA_even = i32x4_to_f64x2(v128.and(invAc, mask));
-      const invA_odd = i32x4_to_f64x2(i64x2.shr_u(invAc, 32));
-
-      //const b = Number(polynomial.B % BigInt(p));
-      const pInv_even = v128.load(stepInvsEven + i); // (1 + 2**-52) / p
-      const pInv_odd = v128.load(stepInvsOdd + i); // (1 + 2**-52) / p
-
-      // FastMod(BB, p):
-      let j = (BBlength - 1) << 3;
-      let BBj = f64x2.splat(f64.load(BB + j));
-      let b_even = BBj;
-      let b_odd = BBj;
-      b_even = mod(b_even, p_even, pInv_even);
-      b_odd = mod(b_odd, p_odd, pInv_odd);
-
-      let x_even = i64x2.splat(0x4320000000000000); // 2**51
-      let x_odd = i64x2.splat(0x4320000000000000); // 2**51
-      x_even = mod(x_even, p_even, pInv_even);
-      x_odd = mod(x_odd, p_odd, pInv_odd);
-      if (j !== 0) {
-        do {
-          j -= 8;
-          BBj = f64x2.splat(f64.load(BB + j));
-          b_even = madd(b_even, x_even, BBj);
-          b_odd = madd(b_odd, x_odd, BBj);
-          b_even = mod(b_even, p_even, pInv_even);
-          b_odd = mod(b_odd, p_odd, pInv_odd);
-        } while (j !== 0);
-      }
-      b_even = f64x2.sub(p_even, b_even);
-      b_odd = f64x2.sub(p_odd, b_odd);
-
-      let x1_even = madd(f64x2.add(b_even, f64x2.sub(p_even, root_even)), invA_even, offsetValue);
-      let x1_odd = madd(f64x2.add(b_odd, f64x2.sub(p_odd, root_odd)), invA_odd, offsetValue);
-      let x2_even = madd(f64x2.add(b_even, root_even), invA_even, offsetValue);
-      let x2_odd = madd(f64x2.add(b_odd, root_odd), invA_odd, offsetValue);
-
-      x1_even = mod(x1_even, p_even, pInv_even); // x1 mod p
-      x1_odd = mod(x1_odd, p_odd, pInv_odd); // x1 mod p
-      x2_even = mod(x2_even, p_even, pInv_even); // x2 mod p
-      x2_odd = mod(x2_odd, p_odd, pInv_odd); // x2 mod p
-
-      const x1c = v128.or(f64x2_to_i32x4(x1_even),
-                          i64x2.shl(f64x2_to_i32x4(x1_odd), 32));
-      const x2c = v128.or(f64x2_to_i32x4(x2_even),
-                          i64x2.shl(f64x2_to_i32x4(x2_odd), 32));
-
-      const r1 = i32x4.min_s(x1c, x2c);
-      const r2 = i32x4.max_s(x1c, x2c);
-
-      v128.store(wheelRoots1 + i, r1);
-      v128.store(wheelRoots2 + i, r2);
+      const a = v128.load(alphav + i);
+      const p = v128.and(v128.load(wheelSteps + i), i32x4.splat(134217727));
+      let r1 = v128.load(wheelRoots1 + i);
+      let r2 = v128.load(wheelRoots2 + i);
+      r1 = i32x4.sub(r1, i32x4.sub(a, i32x4.splat(e)));
+      r2 = i32x4.sub(r2, i32x4.sub(a, i32x4.splat(e)));
+      const t1 = i32x4.sub(r1, p);
+      const t2 = i32x4.sub(r2, p);
+      r1 = i32x4.add(i32x4.add(t1, v128.and(i32x4.shr_s(r1, 31), p)), v128.and(i32x4.shr_s(t1, 31), p)); // r1 mod p
+      r2 = i32x4.add(i32x4.add(t2, v128.and(i32x4.shr_s(r2, 31), p)), v128.and(i32x4.shr_s(t2, 31), p)); // r2 mod p
+      v128.store(wheelRoots1 + i, i32x4.min_s(r1, r2));
+      v128.store(wheelRoots2 + i, i32x4.max_s(r1, r2));
     }
-    return 0;
-  };
-  export function handleSmallWheels(A:i32, wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, sieveSize:i32, storage:i32, smoothEntriesXStart:i32, smoothEntriesXEnd:i32, stepInvsEven:i32, stepInvsOdd:i32):i32 {
-    const sieveSizef64 = f64(sieveSize);
+  }
+  function testDivisibility(n:v128, a:v128, b:v128):v128 {
+    // https://math.stackexchange.com/a/1251328
+    return i32x4.le_u(i32x4.mul(a, n), b);
+  }
+  export function handleSmallWheels(wheelsCount:i32, wheelRoots1:i32, wheelRoots2:i32, wheelSteps:i32, divTestA:i32, divTestB:i32, storage:i32, smoothEntriesXStart:i32, smoothEntriesXEnd:i32):i32 {
     let k = storage;
-    for (let j = 0; j < (A << 2); j += 16) {
-      const proot1c = v128.load(wheelRoots1 + j);
-      const proot2c = v128.load(wheelRoots2 + j);
-      const pc = v128.and(v128.load(wheelSteps + j), i32x4.splat(134217727));
-
-      const mask = i64x2.splat(0x00000000FFFFFFFF); // 2**32 - 1
-
-      const p_even = i32x4_to_f64x2(v128.and(pc, mask));
-      const p_odd = i32x4_to_f64x2(i64x2.shr_u(pc, 32));
-      
-      const proot1_even = i32x4_to_f64x2(v128.and(proot1c, mask));
-      const proot1_odd = i32x4_to_f64x2(i64x2.shr_u(proot1c, 32));
-
-      const proot2_even = i32x4_to_f64x2(v128.and(proot2c, mask));
-      const proot2_odd = i32x4_to_f64x2(i64x2.shr_u(proot2c, 32));
-
-      const pInv_even = v128.load(stepInvsEven + j); // (1 + 2**-52) / p
-      const pInv_odd = v128.load(stepInvsOdd + j); // (1 + 2**-52) / p
-
-      const sieveSizex2 = f64x2.splat(sieveSizef64);
-      let a_even = f64x2.add(proot1_even, sieveSizex2);
-      let a_odd = f64x2.add(proot1_odd, sieveSizex2);
-      let b_even = f64x2.add(proot2_even, sieveSizex2);
-      let b_odd = f64x2.add(proot2_odd, sieveSizex2);
-      a_even = mod(a_even, p_even, pInv_even);
-      a_odd = mod(a_odd, p_odd, pInv_odd);
-      b_even = mod(b_even, p_even, pInv_even);
-      b_odd = mod(b_odd, p_odd, pInv_odd);
-
-      for (let i = smoothEntriesXStart; i < smoothEntriesXEnd; i += 8) {
-        const e = f64x2.splat(f64.load(i));
-        const x_even = mod(e, p_even, pInv_even);
-        const x_odd = mod(e, p_odd, pInv_odd);
-        if (v128.any_true(v128.or(v128.or(f64x2.eq(x_even, a_even), f64x2.eq(x_odd, a_odd)),
-                                  v128.or(f64x2.eq(x_even, b_even), f64x2.eq(x_odd, b_odd))))) {
-          const e = i32(f64.load(i));
-          for (let j1 = j; j1 < j + 16 && j1 < (A << 2); j1 += 4) {
+    for (let j = 0; j < (wheelsCount << 2); j += 16) {
+      const proot1 = v128.load(wheelRoots1 + j);
+      const proot2 = v128.load(wheelRoots2 + j);
+      const ta = v128.load(divTestA + j);
+      const tb = v128.load(divTestB + j);
+      for (let i = smoothEntriesXStart; i < smoothEntriesXEnd; i += 4) {
+        const e = i32x4.splat(i32.load(i));
+        if (v128.any_true(v128.or(testDivisibility(i32x4.sub(proot1, e), ta, tb), testDivisibility(i32x4.sub(proot2, e), ta, tb)))) {
+          const e = i32.load(i);
+          for (let j1 = j; j1 < j + 16 && j1 < (wheelsCount << 2); j1 += 4) {
             const proot1 = i32.load(wheelRoots1 + j1);
             const proot2 = i32.load(wheelRoots2 + j1);
-            const step = i32.load(wheelSteps + j1) & 134217727;
+            const p = i32.load(wheelSteps + j1) & 134217727;
             if (proot1 !== 0 || proot2 !== 0) {
-              if ((e - (proot1 + sieveSize)) % step == 0 ||
-                  (e - (proot2 + sieveSize)) % step == 0) {
+              if ((proot1 - e) % p === 0 ||
+                  (proot2 - e) % p === 0) {
                 i32.store((k) << 2, j1 >> 2);
-                i32.store((k + 1) << 2, (i - smoothEntriesXStart) >> 3);
+                i32.store((k + 1) << 2, (i - smoothEntriesXStart) >> 2);
                 k += 2;
                 if (proot1 === proot2) {
                   i32.store((k) << 2, j1 >> 2);
-                  i32.store((k + 1) << 2, (i - smoothEntriesXStart) >> 3);
+                  i32.store((k + 1) << 2, (i - smoothEntriesXStart) >> 2);
                   k += 2;
                 }
               }
@@ -933,13 +792,41 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
     }
     return k - storage;
-  };
+  }
 
   */
 
-  function mod(a, m) {
-    return a - Math.floor(a / m) * m;
+
+  function computeDivTestAB(d) {
+    // see https://math.stackexchange.com/a/1251328
+    if (d % 2 === 0) {
+      if (d !== 2**Math.round(Math.log2(d))) {
+        throw new RangeError();
+      }
+      // power of two
+      return {a: 2**32 / d, b: 0};
+    }
+    //TODO: optimize slightly
+    const a = Number(modInverse(BigInt(d), 2n**32n));
+    return {a: a, b: Math.floor((2**32 - 1) / d)};
   }
+
+  //console.log(computeDivTestAB(5)); - {a: 3435973837, b: 858993459}
+
+  for (let i = 0; i < wheelsCount; i += 1) {
+    const p = heap32[wheelSteps + i] & 134217727;
+    const tmp = computeDivTestAB(p)
+    heap32[divTestA + i] = tmp.a;
+    heap32[divTestB + i] = tmp.b;
+  }
+
+  function mod(a, m, mInv) {
+    return a - Math.floor(a * mInv) * m;
+  }
+
+  let BPrev = 0n;
+  let Bdistances = [];
+  let counternext = 0;
 
   const updateWheels = function (polynomial, offset) {
     offset = -0 + offset;
@@ -947,25 +834,75 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //proot = ((-B + root) * modInv(A, p)) % p;
     //+some optimizations to minimize bigint usage and modInverseSmall calls
     const AA = FastModBigInt((polynomial.useQ2Form ? 2n : 1n) * polynomial.A);
-    const BB = FastModBigInt(polynomial.B);
+    const bsign = polynomial.B < 0n ? -1 : +1;
+    const BB = FastModBigInt(polynomial.B < 0n ? -polynomial.B : polynomial.B);
     const useCache = BigInt(polynomial.A) === BigInt(invCacheKey);
     if (!useCache) {
+      //  first one: ((-B + root) * modInv(A, p) - offset) % p
+      //  next proots: (-(B - Bprev) * modInv(A, p) + prootPrev) % p, where (-(B - Bprev) * modInv(A, p)) mod p is cached
       zeroInvs.length = 0;
       for (let i = 0; i < wheelsCount; i += 1) {
         const p = -0 + (heap32[wheelSteps + i] & 134217727);
+        const pInv = (1 + 2**-52) / p;
         //const a = Number(polynomial.A % BigInt(p));
-        const a = -0 + FastMod(AA, p);
+        const a = -0 + FastMod(AA, p, pInv);
         const invA = modInverseSmall(a, p) | 0;
         heap32[invCache + i] = invA;
         if (invA === 0) {
           zeroInvs.push(i);
         }
+        // find roots for the first polynomial:
+        let b = -0 + FastMod(BB, p, pInv);
+        b = bsign < 0 ? -b : b;
+        const root = -0 + heap32[wheelRoots + i];
+        let x1 = ((p - b) + (p - root)) * invA - offset;
+        let x2 = ((p - b) + root) * invA - offset;
+        x1 = mod(x1, p, pInv); // x1 mod p
+        x2 = mod(x2, p, pInv); // x2 mod p
+        const r1 = Math.min(x1, x2);
+        const r2 = Math.max(x1, x2);
+        heap32[wheelRoots1 + i] = r1;
+        heap32[wheelRoots2 + i] = r2;
       }
+      BPrev = 0n;
+      //console.log('Bdistances.length', Bdistances.length, counternext);
+      Bdistances.length = 0;
+      counternext = 0;
     }
-    for (let i = 0; i < BB.length; i += 1) {
-      f64array[BBoffset + i] = BB[i];
+    if (BPrev === 0n) {
+      BPrev = polynomial.B;
+    } else {
+      let d = polynomial.B - BPrev;
+      BPrev = polynomial.B;
+      let e = 0;
+      if (d < 0n) {
+        d += (polynomial.useQ2Form ? 2n : 1n) * polynomial.A;
+        e = 1;
+      }
+      if (d < 0n || d >= polynomial.A * 2n) {
+        throw new RangeError();
+      }
+      let v = Bdistances.indexOf(d);
+      if (v === -1) {
+        Bdistances.push(d);
+        const dd = FastModBigInt(d < 0n ? -d : d);
+        v = Bdistances.length - 1;
+        const alphav = alpha + v * wheelsCount;
+        for (let i = 0; i < wheelsCount; i += 1) {
+          const p = -0 + (heap32[wheelSteps + i] & 134217727);
+          const invA = -0 + heap32[invCache + i];
+          const pInv = (1 + 2**-52) / p;
+          const d = FastMod(dd, p, pInv);
+          let a = (p - d) * invA;
+          a = a + sieveSize; // correction
+          a = mod(a, p, pInv);
+          a = p - a;
+          heap32[alphav + i] = a;
+        }
+      }
+      counternext += 1;
+      updateWheelsInternalNext(wheelsCount, (alpha + v * wheelsCount) << 2, wheelSteps << 2, wheelRoots1 << 2, wheelRoots2 << 2, e);
     }
-    updateWheelsInternal(wheelsCount, wheelSteps << 2, wheelRoots << 2, invCache << 2, BBoffset << 3, BB.length, offset, wheelRoots1 << 2, wheelRoots2 << 2, stepInvsEven << 3, stepInvsOdd << 3);
     for (let j = 0; j < zeroInvs.length; j += 1) {
       const i = zeroInvs[j];
       // single root:
@@ -977,6 +914,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       if (polynomial.useQ2Form) {
         if (wheels0[i].step % 2 === 0) {
           const p = wheels0[i].step;
+          const pInv = 1.0 / p;
           const a = Number(polynomial.A % BigInt(p));
           const b = Number(polynomial.B % BigInt(p));
           const c = Number(polynomial.C % BigInt(p));
@@ -990,8 +928,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             let r2 = (-b + r) / 2 * aInv - offset;
             r1 = r1 - Math.floor(r1 / p) * p;
             r2 = r2 - Math.floor(r2 / p) * p;
-            let test1 = mod(mod(a * mod(r1 + offset, p) + b, p) * mod(r1 + offset, p) + c, p) === 0;
-            let test2 = mod(mod(a * mod(r2 + offset, p) + b, p) * mod(r2 + offset, p) + c, p) === 0;
+            let test1 = mod(mod(a * mod(r1 + offset, p, pInv) + b, p, pInv) * mod(r1 + offset, p, pInv) + c, p, pInv) === 0;
+            let test2 = mod(mod(a * mod(r2 + offset, p, pInv) + b, p, pInv) * mod(r2 + offset, p, pInv) + c, p, pInv) === 0;
             if (test1 && test2) {
               heap32[wheelRoots1 + i] = Math.min(r1, r2);
               heap32[wheelRoots2 + i] = Math.max(r1, r2);
@@ -1050,8 +988,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
-  globalThis.smallSegmentTime = 0;
-  globalThis.largeSegmentTime = 0;
+  QuadraticSieveFactorization.smallSegmentTime = 0;
+  QuadraticSieveFactorization.largeSegmentTime = 0;
+  QuadraticSieveFactorization.receivingTime = 0;
 
   const updateSieveSegment = function (segmentStart) {
     let cycleLength = 1;
@@ -1089,10 +1028,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       subsegmentEnd += S;
       singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, smallWheels * 4, smallWheels * 4 + V * 4, subsegmentEnd, 0);
     }
-    globalThis.smallSegmentTime += performance.now() - t1;
+    QuadraticSieveFactorization.smallSegmentTime += performance.now() - t1;
     const t2 = performance.now();
     singleBlockSieve(wheelRoots1 * 4, wheelRoots2 * 4, wheelSteps * 4, smallWheels * 4, wheelsCount * 4, segmentSize, segmentSize);
-    globalThis.largeSegmentTime += performance.now() - t2;
+    QuadraticSieveFactorization.largeSegmentTime += performance.now() - t2;
   };
 
   const smoothEntries = [];
@@ -1164,55 +1103,39 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
 
-  const set = new Uint8Array(arrayBuffer, 0, (sieveSize >> 6) + 1); // reusing sieve just to avoid some pointer arithmetic
-  //globalThis.countersFound = [0, 0];
   function findPreciseSmoothEntries(offset) {
     const smoothEntries2A = new Float64Array(smoothEntries.length);
     if (smoothEntries.length > 512) {
       throw new Error();//!!!
     }
     for (let i = 0; i < smoothEntries.length; i += 1) {
-      f64array[smoothEntriesX + i] = -0 + (smoothEntries[i] - offset);
+      heap32[smoothEntriesX + i] = (smoothEntries[i] - offset) - sieveSize;
     }
-    for (let i = smoothEntries.length; i < smoothEntries.length + 1; i += 1) {
-      f64array[smoothEntriesX + i] = f64array[smoothEntriesX + (smoothEntries.length - 1)];
-    }
-    let A = Math.max(smallWheels, Math.min(Math.ceil(wheelsCount * 1.5 / smoothEntries.length), wheelsCount));
-    A += (4 - A % 4) % 4;
     for (let j = 0; j < smallWheels; j += 1) {
       const step = heap32[wheelSteps + j] & 134217727;
       if (heap32[wheelRoots1 + j] !== sieveSize) {
-        heap32[wheelRoots1 + j] = heap32[wheelRoots1 + j] + (0 - sieveSize) % step + step;
+        let x = (heap32[wheelRoots1 + j] + (0 - sieveSize) % step);
+        heap32[wheelRoots1 + j] = x <= 0 ? x + step : x;
       } else {
         heap32[wheelRoots1 + j] = 0;
       }
       if (heap32[wheelRoots2 + j] !== sieveSize) {
-        heap32[wheelRoots2 + j] = heap32[wheelRoots2 + j] + (0 - sieveSize) % step + step;
+        let x = (heap32[wheelRoots2 + j] + (0 - sieveSize) % step);
+        heap32[wheelRoots2 + j] = x <= 0 ? x + step : x;
       } else {
         heap32[wheelRoots2 + j] = 0;
       }
     }
-    const k1 = handleSmallWheels(A, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, sieveSize, storage, smoothEntriesX << 3, (smoothEntriesX + smoothEntries.length) << 3, stepInvsEven << 3, stepInvsOdd << 3);
-    //for (let i = 0; i < set.length; i += 1) {
-      //set[i] = 0;
-    //}
-    for (let i = 0; i < set.length; i += 4) {
-      heap32[i >> 2] = 0;
-    }
-    for (let i = 0; i < smoothEntries.length; i += 1) {
-      const e = (smoothEntries[i] - offset);
-      set[e >> 6] |= (1 << ((e >> (6 - 3)) & 7));
-    }
-    const k = k1 + findPreciseSmoothEntriesInternal(offset, A, wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, sieveSize, storage + k1);
+    const t = performance.now();
+    const k = handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntries.length) << 2);
+    QuadraticSieveFactorization.receivingTime += performance.now() - t;
+
     for (let v = 0; v < k; v += 2) {
       const j = heap32[storage + v];
-      const a = heap32[storage + v + 1];
-      const i = v < k1 ? a : indexOf(smoothEntries, 0 + a + offset);
-      if (i !== -1) {
-        const step = heap32[wheelSteps + j] & 134217727;
-        smoothEntries2A[i] += +wheelLogs0[j];
-        smoothEntries3[i].push(step);
-      }
+      const i = heap32[storage + v + 1];
+      const step = heap32[wheelSteps + j] & 134217727;
+      smoothEntries2A[i] += +wheelLogs0[j];
+      smoothEntries3[i].push(step);
     }
     for (let i = 0; i < smoothEntries2.length; i += 1) {
       const e = Math.abs(smoothEntries2[i] - smoothEntries2A[i]);
@@ -1492,9 +1415,11 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const solution = solutions.next([v, {c: c, v: v}]).value;
         if (true) {
           congruencesFound += 1;
-          if (congruencesFound === 75) {
-            //console.debug('smallSegmentTime: ' + globalThis.smallSegmentTime, 'largeSegmentTime: ' + globalThis.largeSegmentTime);
-            //return 1n;
+          if (true && congruencesFound % 400 === 0) {
+            console.debug('smallSegmentTime: ' + QuadraticSieveFactorization.smallSegmentTime,
+                          'largeSegmentTime: ' + QuadraticSieveFactorization.largeSegmentTime,
+                          'receivingTime:' + QuadraticSieveFactorization.receivingTime);
+            return 1n;
           }
           const now = +Date.now();
           if (now - last > 5000 || solution != null) {
@@ -1532,5 +1457,3 @@ QuadraticSieveFactorization.testables = {
 };
 
 export default QuadraticSieveFactorization;
-
-// see also https://github.com/danaj/Math-Prime-Util-GMP
