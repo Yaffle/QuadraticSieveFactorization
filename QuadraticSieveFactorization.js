@@ -1415,7 +1415,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const solution = solutions.next([v, {c: c, v: v}]).value;
         if (true) {
           congruencesFound += 1;
-          if (true && congruencesFound % 400 === 0) {
+          if (false && congruencesFound % 400 === 0) {
             console.debug('smallSegmentTime: ' + QuadraticSieveFactorization.smallSegmentTime,
                           'largeSegmentTime: ' + QuadraticSieveFactorization.largeSegmentTime,
                           'receivingTime:' + QuadraticSieveFactorization.receivingTime);
