@@ -766,7 +766,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const tb = v128.load(divTestB + j);
       for (let i = smoothEntriesXStart; i < smoothEntriesXEnd; i += 4) {
         const e = i32x4.splat(i32.load(i));
-        // divisibility test is based on https://math.stackexchange.com/a/1251328 :
+        // divisibility test is based on https://math.stackexchange.com/a/1251328 and https://lomont.org/posts/2017/divisibility-testing/ :
         if (v128.any_true(i32x4.le_u(i32x4.min_u(i32x4.mul(i32x4.sub(proot1, e), ta), i32x4.mul(i32x4.sub(proot2, e), ta)), tb))) {
           const e = i32.load(i);
           for (let j1 = j; j1 < j + 16 && j1 < (wheelsCount << 2); j1 += 4) {
@@ -797,7 +797,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
 
   function computeDivTestAB(d) {
-    // see https://math.stackexchange.com/a/1251328
+    // see https://math.stackexchange.com/a/1251328 and https://lomont.org/posts/2017/divisibility-testing/
     if (d % 2 === 0) {
       if (d !== 2**Math.round(Math.log2(d))) {
         throw new RangeError();
