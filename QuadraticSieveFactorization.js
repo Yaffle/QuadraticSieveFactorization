@@ -539,7 +539,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : 400), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : 800), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -914,9 +914,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (wheels0[i].step % 2 === 0) {
           const p = wheels0[i].step;
           const pInv = 1.0 / p;
-          const a = Number(polynomial.A % BigInt(p));
-          const b = Number(polynomial.B % BigInt(p));
-          const c = Number(polynomial.C % BigInt(p));
+          const a = Number(polynomial.A & BigInt(p - 1));
+          const b = Number(polynomial.B & BigInt(p - 1));
+          const c = Number(polynomial.C & BigInt(p - 1));
           const aInv = modInverseSmall(a, p);
           const r0 = heap32[wheelRoots + i];
           for (let k = 0; k < (p === 2 ? 1 : 2); k += 1) {
