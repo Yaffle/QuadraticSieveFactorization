@@ -522,7 +522,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
     if (Number(N) > 2**240) {
-      sieveSize1 = Math.floor(sieveSize1 / 3.2);
+      sieveSize1 = Math.floor(sieveSize1 / 3.2 / 1.5);
     } else {
       sieveSize1 = Math.floor(sieveSize1 / 1.5);
     }
@@ -539,7 +539,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : 800), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : 1000), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -735,8 +735,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     return 0;
   }
   export function findSmoothEntry(thresholdApproximation:i32, i:i32):i32 {
-    let t = i8x16.splat(i8(thresholdApproximation));
-    while (v128.any_true(i8x16.ge_u(v128.load(i), t)) == 0) {
+    const t = i8x16.splat(i8(thresholdApproximation));
+    while (!v128.any_true(i8x16.ge_u(v128.load(i), t))) {
       i += 16;
     }
     return i;
@@ -1126,7 +1126,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
     }
     const t = performance.now();
-    const k = handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntries.length) << 2);
+    const k = smoothEntries.length === 0 ? 0 : handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntries.length) << 2);
     QuadraticSieveFactorization.receivingTime += performance.now() - t;
 
     for (let v = 0; v < k; v += 2) {
@@ -1182,7 +1182,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
           findPreciseSmoothEntries(offset);
         }
-
 
           //Note: separate loop over "smooth entries" is better for performance, seems
           for (let i = i1 + 1; i < smoothEntries.length; i += 1) {
