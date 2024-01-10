@@ -521,8 +521,10 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     sieveSize1 = 3 * 2**14;
     sieveSize1 = Math.min(sieveSize1, Math.ceil(Math.pow(+primes[primes.length - 1], 1.15)));
     sieveSize1 = Math.max(sieveSize1, primes[primes.length - 1] + 1);
-    if (Number(N) > 2**240) {
+    if (Number(N) > 2**270) {
       sieveSize1 = Math.floor(sieveSize1 / 3.2 / 1.5);
+    } else if (Number(N) > 2**240) {
+      sieveSize1 = Math.floor(sieveSize1 / 1.6 / 1.5);
     } else {
       sieveSize1 = Math.floor(sieveSize1 / 1.5);
     }
@@ -539,7 +541,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const SCALE = 2**0;//TODO:
 
   const log2B = Math.log2(primes.length === 0 ? Math.sqrt(2) : +primes[primes.length - 1]);
-  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : 1000), log2B);
+  const largePrimesThreshold = log2B + Math.min(Math.log2(N < 2**240 ? 100 : (N < 2**270 ? 400 : 1000)), log2B);
   const largePrimes = new Map(); // faster (?)
 
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
@@ -1019,7 +1021,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     //}
     // "Block Sieving Algorithms" by Georg Wambach and Hannes Wettig May 1995
     const m = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency === 12 ? 1 : 1.5);
-    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (N > 2**240 ? 4 : 1)));
+    const V = Math.min(0 + wheelsCount - smallWheels, Math.floor(64 * 3 * m * (N > 2**270 ? 4 : (N > 2**240 ? 2 : 1))));
     const S = Math.floor((1 << 15) * m);
     const t1 = performance.now();
     let subsegmentEnd = 0;
@@ -1377,7 +1379,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   // to limit memory usage during "solve" to 2GB:
   const memoryBasedLimit = Math.floor(((performance.memory || {jsHeapSizeLimit: 0}).jsHeapSizeLimit || 0) / 2**32 < 0.99 ? 2**23.5 : 2**23.75);
   const limit = Math.min(memoryBasedLimit, (1 << 25) - 1);
-  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**240 ? 24 : 6))), limit), 1024);
+  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**270 ? 24 : (Number(N) > 2**240 ? 12 : 6)))), limit), 1024);
   const primesList = primes(B);
   let k = 1n;
   k = Number(N) > 2**64 ? BigInt(getBestMultiplier(N, primesList)) : 1n;
