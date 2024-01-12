@@ -499,18 +499,7 @@ function instantiateWasm(memorySize) {
 }
 
 // TOWO: WebAssembly (~17% faster)
-function instantiate(memorySize) {
-  if (true && globalThis.WebAssembly != null) {
-    try {
-      return instantiateWasm(memorySize);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-  const buffer = new ArrayBuffer(memorySize);
-  const exports = AsmModule(globalThis, null, buffer);
-  return Object.assign({}, exports, {memory: {buffer: buffer}});
-}
+
 
 function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   if (typeof N !== 'bigint') {
@@ -577,14 +566,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const wheelLogs0 = new Float64Array(wheels0.length);
   let invCacheKey = 0n;
   const zeroInvs = [];
-
-  function nextValidHeapSize(size) {
-    size = Math.max(size, 2**12);
-    if (size <= 2**24) {
-      return Math.pow(2, Math.ceil(Math.log2(size - 0.5)));
-    }
-    return Math.ceil(size / 2**24) * 2**24;
-  }
   
   const wheelsCount = wheels0.length;
   console.assert(segmentSize % 4 === 0);
@@ -617,8 +598,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const divTestB = memorySize >> 2;
   memorySize += wheelsCount * 4;
 
-  const bufferSize = nextValidHeapSize(memorySize);
-  const exports = instantiate(bufferSize);
+  const exports = instantiateWasm(memorySize);
   const singleBlockSieve = exports.singleBlockSieve;
   const findSmoothEntry = exports.findSmoothEntry;
   const updateWheelsInternalNext = exports.updateWheelsInternalNext;
@@ -648,6 +628,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     if (lp == undefined) {
       // storing polynomial + x has smaller memory usage
       largePrimes.set(p, {polynomial: polynomial, x: x, pb: pb.slice(0)});
+      QuadraticSieveFactorization.lpRels += 1;
     } else {
       const s = BigInt(p);
       const sInverse = modInverse(s, N);
@@ -992,7 +973,6 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   QuadraticSieveFactorization.smallSegmentTime = 0;
   QuadraticSieveFactorization.largeSegmentTime = 0;
-  QuadraticSieveFactorization.receivingTime = 0;
 
   const updateSieveSegment = function (segmentStart) {
     let cycleLength = 1;
@@ -1128,9 +1108,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         heap32[wheelRoots2 + j] = 0;
       }
     }
-    const t = performance.now();
     const k = smoothEntries.length === 0 ? 0 : handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, wheelSteps << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntries.length) << 2);
-    QuadraticSieveFactorization.receivingTime += performance.now() - t;
 
     for (let v = 0; v < k; v += 2) {
       const j = heap32[storage + v];
@@ -1149,6 +1127,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
 
   QuadraticSieveFactorization.lpCounter = 0;
+  QuadraticSieveFactorization.lpRels = 0;
   let i1 = -1;
   let k = 0;
   const iterator = {
@@ -1399,7 +1378,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
     const solutions = solve.sparseSolve(1 + primeBase.length); // find products of Y_k = Y, so that Y is a perfect square
     solutions.next();
     let c = null;
-    const start = Date.now();
+    const start = performance.now();
     let congruencesFound = 0;
     let last = start;
     while ((c = congruences.next().value) != undefined) {
@@ -1415,18 +1394,17 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         const v = c.Y.map(p => (p === -1 ? 0 : 1 + indexOf(primeBase, p) || t()));
         const solution = solutions.next([v, {c: c, v: v}]).value;
         if (true) {
+          const now = performance.now();
           congruencesFound += 1;
           if (false && congruencesFound % 400 === 0) {
             console.debug('smallSegmentTime: ' + QuadraticSieveFactorization.smallSegmentTime,
-                          'largeSegmentTime: ' + QuadraticSieveFactorization.largeSegmentTime,
-                          'receivingTime:' + QuadraticSieveFactorization.receivingTime);
+                          'largeSegmentTime: ' + QuadraticSieveFactorization.largeSegmentTime);
             return 1n;
           }
-          const now = +Date.now();
           if (now - last > 5000 || solution != null) {
             console.debug('congruences found: ', congruencesFound, '/', primeBase.length,
                           'expected time: ', Math.round((now - start) / congruencesFound * primeBase.length),
-                          'large prime congruences: ', QuadraticSieveFactorization.lpCounter,
+                          'large prime congruences: ', QuadraticSieveFactorization.lpCounter + '(' + QuadraticSieveFactorization.lpRels + ')',
                           'polynomials used: ', QuadraticSieveFactorization.polynomialsCounter);
             last = now;
           }
