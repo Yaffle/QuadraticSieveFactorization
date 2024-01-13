@@ -793,10 +793,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         throw new RangeError();
       }
       // power of two
-      return {a: 2**32 / d, b: 0};
+      return {a: (2**32 / d) | 0, b: 0};
     }
     //TODO: optimize slightly
-    const a = Number(modInverse(BigInt(d), 2n**32n));
+    //const aa = Number(modInverse(BigInt(d), 2n**32n)) | 0;
+    const a0 = modInverseSmall(d & (0xFFFF), 1 << 16);
+    const a1 = (a0 * ((1 - Math.imul(d, a0)) >> 16)) & (0xFFFF);
+    const a = ((a1 << 16) >> 0) + a0;
+    //console.assert(a === aa, a, aa);
     return {a: a, b: Math.floor((2**32 - 1) / d)};
   }
 
