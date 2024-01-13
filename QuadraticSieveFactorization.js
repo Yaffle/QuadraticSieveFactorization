@@ -7,6 +7,9 @@ function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
     throw new TypeError();
   }
+  if (Number(m) <= (2**30 - 1)) {
+    return BigInt(modInverseSmall(Number(a), Number(m)));
+  }
   if (a < 0n || a >= m || m <= 0n) {
     throw new RangeError();
   }
@@ -148,14 +151,14 @@ function squareRootModuloOddPrime(n, p, e = 1) { // slow for non-small p
 }
 
 function bitLength(x) {
-  return BigInt(x.toString(16).length * 4);
+  return x.toString(16).length * 4;
 }
 
 function sqrt(x) {
   if (x < BigInt((Number.MAX_SAFE_INTEGER + 1) / 2)) {
     return BigInt(Math.floor(Math.sqrt(Number(BigInt(x)) + 0.5)));
   }
-  const q = (bitLength(x) >> 2n);
+  const q = BigInt(bitLength(x) >> 2);
   const initialGuess = ((sqrt(x >> (q * 2n)) + 1n) << q);
   let a = initialGuess;
   let b = a + 1n;
@@ -217,13 +220,21 @@ function isQuadraticResidueModuloPrime(a, p) {
 }
 
 function significand(a) {
-  const e = Math.max(0, Number(bitLength(a)) - 1023);
+  const s1 = Number(a);
+  if (Math.abs(s1) < 1/0) {
+    return s1 / 2**Math.floor(Math.log2(Math.abs(s1)));
+  }
+  const e = Math.max(0, bitLength(a) - 1023);
   const s = Number(a >> BigInt(e));
   return s / 2**Math.floor(Math.log2(Math.abs(s)));
 }
 
 function exponent(a) {
-  const e = Math.max(0, Number(bitLength(a)) - 1023);
+  const s1 = Number(a);
+  if (Math.abs(s1) < 1/0) {
+    return Math.floor(Math.log2(Math.abs(s1)));
+  }
+  const e = Math.max(0, bitLength(a) - 1023);
   const s = Number(a >> BigInt(e));
   return e + Math.floor(Math.log2(Math.abs(s)));
 }
@@ -375,7 +386,7 @@ QuadraticPolynomial.generator = function (M, primes, N) {
   // see https://www.cecm.sfu.ca/~mmonagan/papers/NT4.pdf
   // "... Contini [5] recommends minimizing the number of duplicate relations found by requiring that the sets {qi} differ by at least two primes ..."
   const elementPrimes = 2;
-  const k = Math.max(elementPrimes, Math.ceil(e / Math.min(14.5, max1) / elementPrimes) * elementPrimes); // number of small primes
+  const k = Math.max(elementPrimes, Math.ceil(e / Math.min(e < 180 ? 14.5 : max1, max1) / elementPrimes) * elementPrimes); // number of small primes
   console.debug('k: ', k, 'useQ2Form: ', useQ2Form);
   const p = nthRootApprox(S, k);
   let s = 0;
