@@ -327,12 +327,12 @@ const useMultiplePolynomials = true;
 
 
 // Q=((ax+b)**2-n)/a
-// max value: sqrt(n)*M * 1/sqrt(2)
 // a~=sqrt(2n)/M
+// max value = n/a = sqrt(n)*M * 1/sqrt(2)
 
 // Q2=((2ax+b)**2-n)/(4a)
-// max value: sqrt(n)*M * 1/(2*sqrt(2)) - max is two times smaller
 // a=sqrt(n/2)/M
+// max value = n/(4a) = sqrt(n)*M * 1/(2*sqrt(2)) - max is two times smaller
 
 // (A * x + B)**2 - N = A * (A * x**2 + 2 * B * x + C), A * C = B**2 - N
 function QuadraticPolynomial(A, B, N, AFactors, useQ2Form) {
@@ -1051,9 +1051,19 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         if (i < j - 1) {
           const tmp = SIEVE_SEGMENT[j - 1];
           SIEVE_SEGMENT[j - 1] = MAX;
-          i = findSmoothEntry(thresholdApproximation, i);
-          while (thresholdApproximation > SIEVE_SEGMENT[i]) {
+          while ((i & 0xF) !== 0 && thresholdApproximation > SIEVE_SEGMENT[i]) {
             i += 1;
+          }
+          if ((i & 0xF) === 0) {
+            i = findSmoothEntry(thresholdApproximation, i);
+            var c = 0;
+            while (thresholdApproximation > SIEVE_SEGMENT[i]) {
+              i += 1;
+              c += 1;
+            }
+            if (c >= 16) {
+              console.error('too big c', c);
+            }
           }
           SIEVE_SEGMENT[j - 1] = tmp;
         }
