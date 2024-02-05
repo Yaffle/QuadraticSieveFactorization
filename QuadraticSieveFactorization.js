@@ -2,6 +2,7 @@
 
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
+import factorSmall from './factorSmall.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
@@ -545,6 +546,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   console.debug('largePrimesThreshold', largePrimesThreshold);
   const largePrimes = new Map(); // faster (?)
 
+  const doubleLargePrimes = Number(N) > 2**285;
+  const doubleLargePrimesThreshold = Math.min(2 * log2B + Math.min(Math.log2(200), log2B), 533);
+  if (doubleLargePrimes) {
+    console.log('doubleLargePrimesThreshold', doubleLargePrimesThreshold);
+  }
+  
+
   // see https://www.youtube.com/watch?v=TvbQVj2tvgc
   const wheels0 = [];
   for (let i = 0; i < primes.length; i += 1) {
@@ -1058,7 +1066,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       throw new TypeError();
     }
     
-    const commonThreshold = (Math.round((polynomial.log2AbsY(0) - largePrimesThreshold) * SCALE + SHIFT) | 0) - 9;
+    const commonThreshold = (Math.round((polynomial.log2AbsY(0) - (doubleLargePrimes ? doubleLargePrimesThreshold : largePrimesThreshold)) * SCALE + SHIFT) | 0) - 9;
 
     let i = 0;
     let thresholdApproximation = 0;
@@ -1066,8 +1074,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       // it is slow to compute the threshold on every iteration, so trying to optimize:
 
       //TODO: the threshold calculation is much more simple in the Youtube videos (?)
-      thresholdApproximation = useMultiplePolynomials ? commonThreshold : Math.floor((polynomial.log2AbsY(i + offset) - largePrimesThreshold) * SCALE + SHIFT + 0.5) | 0;
-      const j = useMultiplePolynomials ? segmentSize : Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + largePrimesThreshold, sieveSize) - offset);
+      thresholdApproximation = useMultiplePolynomials ? commonThreshold : Math.floor((polynomial.log2AbsY(i + offset) - (doubleLargePrimes ? doubleLargePrimesThreshold : largePrimesThreshold)) * SCALE + SHIFT + 0.5) | 0;
+      const j = useMultiplePolynomials ? segmentSize : Math.min(segmentSize, thresholdApproximationInterval(polynomial, i + offset, (thresholdApproximation - SHIFT) * (1 / SCALE) + (doubleLargePrimes ? doubleLargePrimesThreshold : largePrimesThreshold), sieveSize) - offset);
 
       while (i < j) {
         if (i < j - 1) {
@@ -1090,7 +1098,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           SIEVE_SEGMENT[j - 1] = tmp;
         }
         const r = polynomial.log2AbsY(i + offset) - (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE);
-        if (r < largePrimesThreshold) {
+        if (r < largePrimesThreshold || doubleLargePrimes && r >= log2B * 2 && r < doubleLargePrimesThreshold) {
           smoothEntries.push(i + offset);
           smoothEntries2.push(-0 + (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
         }
@@ -1170,13 +1178,251 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
 
+  // Double Large Primes:
+  function Queue() {
+    this.a = [];
+    this.b = [];
+    this.length = 0;
+  }
+  Queue.prototype.push = function (e) {
+    this.a.push(e);
+    this.length = this.a.length + this.b.length;
+  };
+  Queue.prototype.shift = function (e) {
+    if (this.b.length === 0) {
+      while (this.a.length > 0) {
+        this.b.push(this.a.pop());
+      }
+    }
+    var e = this.b.pop();
+    this.length = this.a.length + this.b.length;
+    return e;
+  };
+
+  function Graph() {
+    this.edges = 0;
+    this.components = 0;
+    this.vertices = 0;
+    this._edges = new Map();
+    this._g = new Map();
+  }
+  Graph.prototype._insertVertex = function (p) {
+    const g = this._g;
+    let root = g.get(p);
+    if (root === undefined) {
+      root = p;
+      g.set(p, root);
+      this.vertices += 1;
+      this.components += 1;
+    } else {
+      while (g.get(root) !== root) {
+        root = g.get(root);
+      }
+      let x = p;
+      while (x !== root) {
+        const next = g.get(x);
+        g.set(x, root);
+        x = next;
+      }
+    }
+    return root;
+  };
+  Graph.prototype.insertEdge = function (p1, p2, data) {
+    const p1p2 = p1 * p2;
+    if (this._edges.get(p1p2) !== undefined) {
+      console.count('same p1p2');
+      return;
+    }
+    this._edges.set(p1p2, data);
+    this.edges += 1;
+    const p1root = this._insertVertex(p1);
+    const p2root = this._insertVertex(p2);
+    if (p1root < p2root) {
+      this.components -= 1;
+      this._g.set(p2root, p1root);
+    }
+    if (p1root > p2root) {
+      this.components -= 1;
+      this._g.set(p1root, p2root);
+    }
+  };
+  Graph.prototype.iterateCycles = function (onCycle) {
+    const nodes = new Map();
+    const edgesArray = Array.from(this._edges.values());
+    edgesArray.sort((a, b) => a.p1 - b.p1 || a.p2 - b.p2);
+    
+    //TODO: FIX
+    for (var i = edgesArray.length - 1; i >= 0; i -= 1) {
+      edgesArray.push(Object.assign({}, edgesArray[i], {p1: edgesArray[i].p2, p2: edgesArray[i].p1}))
+    }
+    edgesArray.sort((a, b) => a.p1 - b.p1 || a.p2 - b.p2);
+
+    const roots = [];
+    for (let v of this._g.keys()) {
+      if (this._g.get(v) === v) {
+        roots.push(v);
+      }
+      nodes.set(v, {explored: false, finished: false, parent: 0});
+    }
+    const p1Array = edgesArray.map(r => r.p1);
+
+    var path = function (w, path) {
+      while (w !== 0) {
+        var n = nodes.get(w).parent;
+        if (n !== 0) {
+          path.push(this._edges.get(n * w));
+        }
+        w = n;
+      }
+    }.bind(this);
+
+    for (const r of roots) {
+      // https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
+      let Q = new Queue();
+      const root = nodes.get(r);
+      console.assert(root.explored === false && root.parent === 0);
+      root.explored = true;
+      root.parent = 0;
+      Q.push(r);
+      while (Q.length > 0) {
+        const v = Q.shift();
+        var start = indexOf(p1Array, v);
+        //console.assert(p1Array.lastIndexOf(v) === start);
+        for (let i = start; i >= 0 && edgesArray[i].p1 === v; i -= 1) {
+          const edge = edgesArray[i];
+          const p2 = nodes.get(edge.p2);
+          if (p2.explored) {
+            if (p2.finished) continue;
+            // cycle
+            var path1 = [];
+            var path2 = [];
+
+            path(edge.p2, path1);
+            path(edge.p1, path2);
+            var i3 = 0;
+            while (path1.length - 1 - i3 >= 0 && path2.length - 1 - i3 >= 0 && path1[path1.length - 1 - i3] === path2[path2.length - 1 - i3]) {
+              i3 += 1;
+            }
+
+            var edges = path1.slice(0, path1.length - i3).reverse().concat([edge]).concat(path2.slice(0, path2.length - i3));
+            onCycle(edges);
+
+          } else {
+            p2.explored = true;
+            p2.parent = edge.p1;
+            Q.push(edge.p2);
+          }
+        }
+        nodes.get(v).finished = true;
+      }
+    }
+  };
+
+  const onCycle = function (edges) {
+    let s = 1n;
+    let X = 1n;
+    let Y = [];
+    for (let j = 0; j < edges.length; j += 1) {
+      const lp = edges[j];
+      //const lpX = lp.polynomial.X(lp.x);
+      //const lpY = lp.polynomial.Y(lp.x, BigInt(lp.p1 * lp.p2), lp.pb);
+      const lpX = BigInt(lp.X);
+      const lpY = lp.Y;
+      X = (lpX * X) % N;
+      if (Y == null || lpY == null) {
+        Y = null;
+      } else {
+        Y = Y.concat(lpY);
+      }
+      const prev = j === 0 ? edges[edges.length - 1] : edges[j - 1];
+      s = (s * BigInt( prev.p1 === lp.p1 || prev.p2 === lp.p1 ? lp.p2 : lp.p1 )) % N;
+    }
+    const sInverse = modInverse(s, N);
+    if (sInverse === 0n) {
+      return new CongruenceOfsquareOfXminusYmoduloN(s, [0], N);//?
+    }
+    X = (sInverse * X) % N;
+    if (Y != null) {
+      const c = new CongruenceOfsquareOfXminusYmoduloN(X, Y, N);
+      
+      if (true) {
+        //test:
+        if ((X**2n - Y.reduce((p, a) => p * BigInt(a), 1n)) % N !== 0n) {
+          throw new Error();
+        }
+      }
+      
+      foundGraphRelations.push(c);
+    }
+  };
+
+  const graph = new Graph();
+  const foundGraphRelations = [];
+  let collected = false;
+  let total = 0;
+
+  function handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb) {
+    graph.insertEdge(p1, p2, {p1: p1, p2: p2, X: polynomial.X(x), Y: polynomial.Y(x, BigInt(p1) * BigInt(p2), pb)});
+    const cyclesCount = graph.edges + graph.components - graph.vertices;
+    if (graph.edges % 10000 === 0) {
+      console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
+    }
+    if (cyclesCount > primes.length + 64 - total && !collected) {//TODO: !?
+      collected = true;//!?
+      console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
+      console.time('collectGraphRelations');
+      graph.iterateCycles(onCycle);
+      console.timeEnd('collectGraphRelations');
+      console.log(foundGraphRelations.length);
+    }
+  }
+
+  function handleDoubleLargePrime(x, polynomial, pb) {
+    let Y = abs(polynomial.Y(x));
+    for (let j = pb.length - 1; j >= 0; j -= 1) { // backwards is slighly faster
+      const p = pb[j];
+      while (Y % BigInt(p) === 0n) {
+        Y /= BigInt(p);
+      }
+    }
+    const r = Number(Y);
+    if (r >= 2**53) {
+      return;
+    }
+    if (isProbablyPrime(r)) {
+      return;
+    }
+    
+    const f = factorSmall(r, 2**15);
+    if (f === 0 || f === 1) {
+      console.count('cannot factor');
+      return;      
+    }
+    if (Number(BigInt(r) % BigInt(f)) !== 0 || !(f > 1 && f < r)) {
+      throw new Error();
+    }
+    const f2 = Math.floor(Number(BigInt(r) / BigInt(f)));
+    const p1 = Math.min(f2, f);
+    const p2 = Math.max(f2, f);
+    if (!(Math.log2(p1) > log2B && p1 <= 2147483647 && p2 <= 2147483647)) {
+      //console.count('invalid values');
+      return;
+    }
+    handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb);
+  }
+
   QuadraticSieveFactorization.lpCounter = 0;
   QuadraticSieveFactorization.lpRels = 0;
   let i1 = -1;
   let k = 0;
   const iterator = {
     next: function congruencesUsingQuadraticSieve() {
+      total += 1;
       while ((useMultiplePolynomials ? 2 : 1/16) * k * sieveSize <= Math.pow(primes[primes.length - 1], 2)) {
+        if (foundGraphRelations.length !== 0) {
+          return {value: foundGraphRelations.pop(), done: false};
+        }
+
         if (i1 === sieveSize) {
           k += 1;
           i1 = -1;
@@ -1240,7 +1486,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 i1 = i;
                 QuadraticSieveFactorization.lpCounter += 1;
                 return {value: c, done: false};
+              } else {
+                if (doubleLargePrimes && p <= 2147483647) {
+                  handleDoubleLargePrimeNext(1, p, x, polynomial, smoothEntries3[i]);
+                }
               }
+            } else if (doubleLargePrimes && threshold - value < 3 * log2B) {
+              handleDoubleLargePrime(x, polynomial, smoothEntries3[i]);
             } else {
               console.count('too big', (threshold - value) / log2B);
             }
@@ -1403,7 +1655,8 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
   // to limit memory usage during "solve" to 2GB:
   const memoryBasedLimit = Math.floor(((performance.memory || {jsHeapSizeLimit: 0}).jsHeapSizeLimit || 0) / 2**32 < 0.99 ? 2**23.5 : 2**23.75);
   const limit = Math.min(memoryBasedLimit, (1 << 25) - 1);
-  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**285 ? 24 : (Number(N) > 2**240 ? 12 : 6)))), limit), 1024);
+  const dlpMultiplier = 2.5;//TODO: when using double large primes
+  const B = Math.max(Math.min(Math.floor(Math.sqrt(L(N) / (Number(N) > 2**285 ? 24 * dlpMultiplier : (Number(N) > 2**240 ? 12 : 6)))), limit), 1024);
   const primesList = primes(B);
   let k = 1n;
   k = Number(N) > 2**64 ? BigInt(getBestMultiplier(N, primesList)) : 1n;
