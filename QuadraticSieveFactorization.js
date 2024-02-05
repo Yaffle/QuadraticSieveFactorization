@@ -3,6 +3,7 @@
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
 import factorSmall from './factorSmall.js';
+import isProbablyPrime from './isProbablyPrime.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
