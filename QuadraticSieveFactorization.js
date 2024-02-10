@@ -2,8 +2,8 @@
 
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
-import factorSmall from './factorSmall.js';
-import isProbablyPrime from './isProbablyPrime.js';
+import factorByPollardRhoSmall63m from './factorByPollardRhoSmall63m.js';
+import isProbablyPrime64 from './isProbablyPrime64.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {
@@ -548,7 +548,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   const largePrimes = new Map(); // faster (?)
 
   const doubleLargePrimes = Number(N) > 2**285;
-  const doubleLargePrimesThreshold = Math.min(2 * log2B + Math.min(Math.log2(200), log2B), 533);
+  const doubleLargePrimesThreshold = Math.min(2 * log2B + Math.min(Math.log2(200), log2B), 64);
   if (doubleLargePrimes) {
     console.log('doubleLargePrimesThreshold', doubleLargePrimesThreshold);
   }
@@ -822,6 +822,13 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
 
   */
 
+  function modInverseMod2pow32(a) {
+    let aInv = a;
+    for (let e = 2; e < 32; e += e) {
+      aInv = Math.imul(aInv, 2 - Math.imul(a, aInv));
+    }
+    return aInv;
+  }
 
   function computeDivTestAB(d, Nmax) {
     // see https://math.stackexchange.com/a/1251328 and https://lomont.org/posts/2017/divisibility-testing/
@@ -832,12 +839,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       // power of two
       return {a: (2**32 / d) | 0, b: 0};
     }
-    //TODO: optimize slightly
-    //const aa = Number(modInverse(BigInt(d), 2n**32n)) | 0;
-    const a0 = modInverseSmall(d & (0xFFFF), 1 << 16);
-    const a1 = (a0 * ((1 - Math.imul(d, a0)) >> 16)) & (0xFFFF);
-    const a = ((a1 << 16) >> 0) + a0;
-    //console.assert(a === aa, a, aa);
+    const a = modInverseMod2pow32(d);
     let b = Math.floor(Nmax / d);
     b = b < 2**16 ? b : (b | 0xFFFF);
     console.assert(b <= Math.floor((2**32 - 1) / d));
@@ -1386,20 +1388,19 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         Y /= BigInt(p);
       }
     }
-    const r = Number(Y);
-    if (r >= 2**53) {
+    const r = BigInt(Y);
+    if (Number(r) >= 2**64) {
       return;
     }
-    if (isProbablyPrime(r)) {
+    if (isProbablyPrime64(r)) {
       return;
     }
-    
-    const f = factorSmall(r, 2**15);
+    const f = Number(factorByPollardRhoSmall63m(r, 2**18));
     if (f === 0 || f === 1) {
       console.count('cannot factor');
       return;      
     }
-    if (Number(BigInt(r) % BigInt(f)) !== 0 || !(f > 1 && f < r)) {
+    if (BigInt(r) % BigInt(f) !== BigInt(0) || !(f > 1 && BigInt(f) < BigInt(r))) {
       throw new Error();
     }
     const f2 = Math.floor(Number(BigInt(r) / BigInt(f)));
