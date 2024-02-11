@@ -1210,23 +1210,21 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     this._g = new Map();
   }
   Graph.prototype._insertVertex = function (p) {
-    const g = this._g;
-    let root = g.get(p);
-    if (root === undefined) {
-      root = p;
-      g.set(p, root);
+    if (!this._g.has(p)) {
+      this._g.set(p, p);
       this.vertices += 1;
       this.components += 1;
-    } else {
-      while (g.get(root) !== root) {
-        root = g.get(root);
-      }
-      let x = p;
-      while (x !== root) {
-        const next = g.get(x);
-        g.set(x, root);
-        x = next;
-      }
+      return p;
+    }
+    let root = this._g.get(p);
+    while (this._g.get(root) !== root) {
+      root = this._g.get(root);
+    }
+    let x = p;
+    while (x !== root) {
+      const next = this._g.get(x);
+      this._g.set(x, root);
+      x = next;
     }
     return root;
   };
@@ -1406,11 +1404,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     const f2 = Math.floor(Number(BigInt(r) / BigInt(f)));
     const p1 = Math.min(f2, f);
     const p2 = Math.max(f2, f);
-    if (!(Math.log2(p1) > log2B && p1 <= 2147483647 && p2 <= 2147483647)) {
+    if (!(Math.log2(p1) > log2B && p1 <= 1073741823 && p2 <= 1073741823)) {
       //console.count('invalid values');
       return;
     }
-    handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb);
+    handleDoubleLargePrimeNext(p1 | 0, p2 | 0, x, polynomial, pb);
   }
 
   QuadraticSieveFactorization.lpCounter = 0;
@@ -1489,8 +1487,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
               if (c != null) {
                 QuadraticSieveFactorization.lpCounter += 1;
               } else {
-                if (doubleLargePrimes && p <= 2147483647) {
-                  handleDoubleLargePrimeNext(1, p, x, polynomial, pb);
+                if (doubleLargePrimes && p <= 1073741823) {
+                  handleDoubleLargePrimeNext(1, p | 0, x, polynomial, pb);
                 }
               }
             } else if (doubleLargePrimes && threshold - value < 3 * log2B) {
