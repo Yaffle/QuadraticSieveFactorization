@@ -1327,10 +1327,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     let Y = [];
     for (let j = 0; j < edges.length; j += 1) {
       const lp = edges[j];
-      //const lpX = lp.polynomial.X(lp.x);
-      //const lpY = lp.polynomial.Y(lp.x, BigInt(lp.p1 * lp.p2), lp.pb);
-      const lpX = BigInt(lp.X);
-      const lpY = lp.Y;
+      const lpX = lp.polynomial.X(lp.x);
+      const lpY = lp.polynomial.Y(lp.x, BigInt(lp.p1 * lp.p2), lp.pb);
       X = (lpX * X) % N;
       if (Y == null || lpY == null) {
         Y = null;
@@ -1365,7 +1363,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let total = 0;
 
   function handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb) {
-    graph.insertEdge(p1, p2, {p1: p1, p2: p2, X: polynomial.X(x), Y: polynomial.Y(x, BigInt(p1) * BigInt(p2), pb)});
+    graph.insertEdge(p1, p2, {p1: p1, p2: p2, polynomial: polynomial, x: x, pb: pb.slice(0)});
     const cyclesCount = graph.edges + graph.components - graph.vertices;
     if (graph.edges % 10000 === 0) {
       console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
@@ -1390,9 +1388,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     const r = BigInt(Y);
     if (Number(r) >= 2**64) {
+      //console.count('2**64');
       return;
     }
     if (isProbablyPrime64(r)) {
+      //console.count('prime');
       return;
     }
     const f = Number(factorByPollardRhoSmall63m(r, 2**18));
@@ -1461,18 +1461,19 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
           for (let i = i1 + 1; i < smoothEntries.length; i += 1) {
             const x = smoothEntries[i];
             const value = +smoothEntries2[i];
+            const pb = smoothEntries3[i];
             const threshold = +polynomial.log2AbsY(x);
+            let c = null;
             if (threshold - value <= log2B) {
               const X = polynomial.X(x);
-              let Y = polynomial.Y(x, 1n, smoothEntries3[i]);
+              let Y = polynomial.Y(x, 1n, pb);
               if (Y == null) {
                 // this may happen because of prime powers
                 // or primes used to make "polynomial.A"
-                Y = polynomial.Y(x, 1n, smoothEntries3[i].concat(zeroInvs.map(i => heap32[wheelSteps + i])));
+                Y = polynomial.Y(x, 1n, pb.concat(zeroInvs.map(i => heap32[wheelSteps + i])));
               }
               if (Y != null) {
-                i1 = i;
-                return {value: new CongruenceOfsquareOfXminusYmoduloN(X, Y, N), done: false};
+                c = new CongruenceOfsquareOfXminusYmoduloN(X, Y, N);
               } else {
                 // may happen when exp2(threshold - value) is a multiplier
                 console.count('wrong entry', exp2(threshold - value));
@@ -1483,20 +1484,22 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
               //if (!isProbablyPrime(p)) {
                 //console.debug('wrong large prime?', p);
               //}
-              const c = lpStrategy(p, polynomial, x, smoothEntries3[i]);
+              c = lpStrategy(p, polynomial, x, pb);
               if (c != null) {
-                i1 = i;
                 QuadraticSieveFactorization.lpCounter += 1;
-                return {value: c, done: false};
               } else {
                 if (doubleLargePrimes && p <= 2147483647) {
-                  handleDoubleLargePrimeNext(1, p, x, polynomial, smoothEntries3[i]);
+                  handleDoubleLargePrimeNext(1, p, x, polynomial, pb);
                 }
               }
             } else if (doubleLargePrimes && threshold - value < 3 * log2B) {
-              handleDoubleLargePrime(x, polynomial, smoothEntries3[i]);
+              handleDoubleLargePrime(x, polynomial, pb);
             } else {
               console.count('too big', (threshold - value) / log2B);
+            }
+            if (c != null) {
+              i1 = i;
+              return {value: c, done: false};
             }
           }
         i1 = sieveSize;
