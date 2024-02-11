@@ -1207,6 +1207,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     this.components = 0;
     this.vertices = 0;
     this._edges = new Map();
+    this._edgesArray = [];
     this._g = new Map();
   }
   Graph.prototype._insertVertex = function (p) {
@@ -1235,6 +1236,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       return;
     }
     this._edges.set(p1p2, data);
+    this._edgesArray.push({p1: p1, p2: p2});
+    this._edgesArray.push({p1: p2, p2: p1});//TODO: FIX
     this.edges += 1;
     const p1root = this._insertVertex(p1);
     const p2root = this._insertVertex(p2);
@@ -1249,14 +1252,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   };
   Graph.prototype.iterateCycles = function (onCycle) {
     const nodes = new Map();
-    const edgesArray = Array.from(this._edges.values());
-    edgesArray.sort((a, b) => a.p1 - b.p1 || a.p2 - b.p2);
-    
-    //TODO: FIX
-    for (var i = edgesArray.length - 1; i >= 0; i -= 1) {
-      edgesArray.push(Object.assign({}, edgesArray[i], {p1: edgesArray[i].p2, p2: edgesArray[i].p1}))
-    }
-    edgesArray.sort((a, b) => a.p1 - b.p1 || a.p2 - b.p2);
+    this._edgesArray.sort((a, b) => a.p1 - b.p1 || a.p2 - b.p2);
 
     const roots = [];
     for (let v of this._g.keys()) {
@@ -1265,17 +1261,21 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       nodes.set(v, {explored: false, finished: false, parent: 0});
     }
-    const p1Array = edgesArray.map(r => r.p1);
+    const p1Array = this._edgesArray.map(edge => edge.p1);
 
     var path = function (w, path) {
       while (w !== 0) {
         var n = nodes.get(w).parent;
         if (n !== 0) {
-          path.push(this._edges.get(n * w));
+          path.push({p1: Math.min(n, w), p2 : Math.max(n, w)});
         }
         w = n;
       }
-    }.bind(this);
+    };
+    
+    var eq = function (a, b) {
+      return a.p1 === b.p1 && a.p2 === b.p2;
+    };
 
     for (const r of roots) {
       // https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
@@ -1289,8 +1289,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         const v = Q.shift();
         var start = indexOf(p1Array, v);
         //console.assert(p1Array.lastIndexOf(v) === start);
-        for (let i = start; i >= 0 && edgesArray[i].p1 === v; i -= 1) {
-          const edge = edgesArray[i];
+        for (let i = start; i >= 0 && this._edgesArray[i].p1 === v; i -= 1) {
+          const edge = this._edgesArray[i];
           const p2 = nodes.get(edge.p2);
           if (p2.explored) {
             if (p2.finished) continue;
@@ -1301,12 +1301,14 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             path(edge.p2, path1);
             path(edge.p1, path2);
             var i3 = 0;
-            while (path1.length - 1 - i3 >= 0 && path2.length - 1 - i3 >= 0 && path1[path1.length - 1 - i3] === path2[path2.length - 1 - i3]) {
+            while (path1.length - 1 - i3 >= 0 && path2.length - 1 - i3 >= 0 && eq(path1[path1.length - 1 - i3], path2[path2.length - 1 - i3])) {
               i3 += 1;
             }
-
-            var edges = path1.slice(0, path1.length - i3).reverse().concat([edge]).concat(path2.slice(0, path2.length - i3));
-            onCycle(edges);
+            const e = {p1: Math.min(edge.p1, edge.p2), p2: Math.max(edge.p1, edge.p2)};
+            var edges = path1.slice(0, path1.length - i3).reverse().concat([e]).concat(path2.slice(0, path2.length - i3));
+            const edgesMap = this._edges;
+            var data = edges.map(e => edgesMap.get(e.p1 * e.p2));
+            onCycle(edges, data);
 
           } else {
             p2.explored = true;
@@ -1319,14 +1321,15 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
-  const onCycle = function (edges) {
+  const onCycle = function (edges, data) {
     let s = 1n;
     let X = 1n;
     let Y = [];
     for (let j = 0; j < edges.length; j += 1) {
       const lp = edges[j];
-      const lpX = lp.polynomial.X(lp.x);
-      const lpY = lp.polynomial.Y(lp.x, BigInt(lp.p1 * lp.p2), lp.pb);
+      const lpData = data[j];
+      const lpX = lpData.polynomial.X(lpData.x);
+      const lpY = lpData.polynomial.Y(lpData.x, BigInt(lp.p1 * lp.p2), lpData.pb);
       X = (lpX * X) % N;
       if (Y == null || lpY == null) {
         Y = null;
@@ -1361,7 +1364,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   let total = 0;
 
   function handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb) {
-    graph.insertEdge(p1, p2, {p1: p1, p2: p2, polynomial: polynomial, x: x, pb: pb.slice(0)});
+    graph.insertEdge(p1, p2, {polynomial: polynomial, x: x, pb: pb.slice(0)});
     const cyclesCount = graph.edges + graph.components - graph.vertices;
     if (graph.edges % 10000 === 0) {
       console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
