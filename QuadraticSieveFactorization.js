@@ -1060,9 +1060,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     QuadraticSieveFactorization.largeSegmentTime += performance.now() - t2;
   };
 
-  const smoothEntries = [];
-  const smoothEntries2 = [];
-  const smoothEntries3 = [];
+  const smoothEntryPositions = [];
+  const smoothEntryValues = [];
+  const smoothEntryFactorBases = [];
 
   const findSmoothEntries = function (offset, polynomial) {
     if (typeof offset !== "number") {
@@ -1102,8 +1102,8 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         }
         const r = polynomial.log2AbsY(i + offset) - (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE);
         if (r < largePrimesThreshold || doubleLargePrimes && r >= log2B * 2 && r < doubleLargePrimesThreshold) {
-          smoothEntries.push(i + offset);
-          smoothEntries2.push(-0 + (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
+          smoothEntryPositions.push(i + offset);
+          smoothEntryValues.push(-0 + (SIEVE_SEGMENT[i] - SHIFT) * (1 / SCALE));
         }
         i += 1;
       }
@@ -1140,12 +1140,11 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
 
   function findPreciseSmoothEntries(offset) {
-    const smoothEntries2A = new Float64Array(smoothEntries.length);
-    if (smoothEntries.length > 512) {
+    if (smoothEntryPositions.length > 512) {
       throw new Error();//!!!
     }
-    for (let i = 0; i < smoothEntries.length; i += 1) {
-      heap32[smoothEntriesX + i] = (smoothEntries[i] - offset) - sieveSize;
+    for (let i = 0; i < smoothEntryPositions.length; i += 1) {
+      heap32[smoothEntriesX + i] = (smoothEntryPositions[i] - offset) - sieveSize;
     }
     for (let j = 0; j < smallWheels; j += 1) {
       const step = heap32[wheelSteps + j];
@@ -1162,22 +1161,23 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
         heap32[wheelRoots2 + j] = 0;
       }
     }
-    //console.log('smoothEntries.length', smoothEntries.length);
-    const k = smoothEntries.length === 0 ? 0 : handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntries.length) << 2);
+    //console.log('smoothEntryPositions.length', smoothEntryPositions.length);
+    const k = smoothEntryPositions.length === 0 ? 0 : handleSmallWheels(wheelsCount, wheelRoots1 << 2, wheelRoots2 << 2, divTestA << 2, divTestB << 2, storage, smoothEntriesX << 2, (smoothEntriesX + smoothEntryPositions.length) << 2);
 
+    const preciseValues = new Float64Array(smoothEntryPositions.length);
     for (let v = 0; v < k; v += 2) {
       const j = heap32[storage + v];
       const i = heap32[storage + v + 1];
       const step = heap32[wheelSteps + j];
-      smoothEntries2A[i] += +wheelLogs0[j];
-      smoothEntries3[i].push(step);
+      preciseValues[i] += +wheelLogs0[j];
+      smoothEntryFactorBases[i].push(step);
     }
-    for (let i = 0; i < smoothEntries2.length; i += 1) {
-      const e = Math.abs(smoothEntries2[i] - smoothEntries2A[i]);
+    for (let i = 0; i < smoothEntryPositions.length; i += 1) {
+      const e = Math.abs(smoothEntryValues[i] - preciseValues[i]);
       if (e >= 9 && e < 100) {
         console.error(e);
       }
-      smoothEntries2[i] = smoothEntries2A[i];
+      smoothEntryValues[i] = preciseValues[i];
     }
   }
 
@@ -1439,29 +1439,30 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
             applyOffset(offset);
           }
 
-          smoothEntries.length = 0;
-          smoothEntries2.length = 0;
+          smoothEntryPositions.length = 0;
+          smoothEntryValues.length = 0;
 
           for (let segmentStart = 0; segmentStart < sieveSize; segmentStart += segmentSize) {
             updateSieveSegment(segmentStart);
             findSmoothEntries(offset + segmentStart, polynomial);
           }
 
-          while (smoothEntries3.length < smoothEntries2.length) {
-            smoothEntries3.push([]);
-          }
-          for (let i = 0; i < smoothEntries3.length; i += 1) {
-            smoothEntries3[i].length = 0;
+          for (let i = 0; i < smoothEntryPositions.length; i += 1) {
+            if (i < smoothEntryFactorBases.length) {
+              smoothEntryFactorBases[i].length = 0;
+            } else {
+              smoothEntryFactorBases.push([]);
+            }
           }
 
           findPreciseSmoothEntries(offset);
         }
 
           //Note: separate loop over "smooth entries" is better for performance, seems
-          for (let i = i1 + 1; i < smoothEntries.length; i += 1) {
-            const x = smoothEntries[i];
-            const value = +smoothEntries2[i];
-            const pb = smoothEntries3[i];
+          for (let i = i1 + 1; i < smoothEntryPositions.length; i += 1) {
+            const x = smoothEntryPositions[i];
+            const value = +smoothEntryValues[i];
+            const pb = smoothEntryFactorBases[i];
             const threshold = +polynomial.log2AbsY(x);
             let c = null;
             if (threshold - value <= log2B) {
