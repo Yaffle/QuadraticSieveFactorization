@@ -1334,7 +1334,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       const lp = edges[j];
       const lpData = data[j];
       const lpX = lpData.polynomial.X(lpData.x);
-      const lpY = lpData.polynomial.Y(lpData.x, BigInt(lp.p1 * lp.p2), lpData.pb);
+      const lpY = lpData.polynomial.Y(lpData.x, BigInt(lp.p1) * BigInt(lp.p2), lpData.pb);
       X = (lpX * X) % N;
       if (Y == null || lpY == null) {
         Y = null;
@@ -1345,20 +1345,16 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     const sInverse = modInverse(s, N);
     if (sInverse === 0n) {
-      return new CongruenceOfsquareOfXminusYmoduloN(s, [0], N);//?
-    }
-    X = (sInverse * X) % N;
-    if (Y != null) {
+      foundGraphRelations.push(new CongruenceOfsquareOfXminusYmoduloN(s, [0], N));//?
+    } else if (Y != null) {
+      X = (sInverse * X) % N;
       const c = new CongruenceOfsquareOfXminusYmoduloN(X, Y, N);
-      
-      if (true) {
-        //test:
-        if ((X**2n - Y.reduce((p, a) => p * BigInt(a), 1n)) % N !== 0n) {
-          throw new Error();
-        }
+      if ((X**2n - Y.reduce((p, a) => p * BigInt(a), 1n)) % N !== 0n) {
+        throw new Error();
       }
-      
       foundGraphRelations.push(c);
+    } else {
+      console.count('BAD CYCLE');
     }
   };
 
