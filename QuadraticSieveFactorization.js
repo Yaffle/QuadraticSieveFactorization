@@ -1493,7 +1493,12 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
                 QuadraticSieveFactorization.lpCounter += 1;
               } else {
                 if (doubleLargePrimes && p <= 1073741823) {
-                  handleDoubleLargePrimeNext(1, p | 0, x, polynomial, pb);
+                  if (polynomial.Y(x, BigInt(p), pb) != null) {
+                    handleDoubleLargePrimeNext(1, p | 0, x, polynomial, pb);
+                  } else {
+                    console.count('wrong?');
+                    console.log(polynomial.Y(x), p);
+                  }
                 }
               }
             } else if (doubleLargePrimes && threshold - value < 3 * log2B) {
