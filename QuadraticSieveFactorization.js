@@ -1182,7 +1182,9 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
   }
 
   // Double Large Primes:
+  
   function Queue() {
+    // Queue using two arrays - https://stackoverflow.com/a/73957258
     this.a = [];
     this.b = [];
     this.length = 0;
@@ -1229,15 +1231,20 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
     return root;
   };
+  const key = function (p1, p2) {
+    return BigInt.asUintN(64, (BigInt(Math.min(p1, p2)) << 32n) + BigInt(Math.max(p1, p2)));
+  };
   Graph.prototype.insertEdge = function (p1, p2, data) {
-    const p1p2 = p1 * p2;
+    const p1p2 = key(p1, p2);
     if (this._edges.get(p1p2) !== undefined) {
       console.count('same p1p2');
       return;
     }
     this._edges.set(p1p2, data);
     this._edgesArray.push({p1: p1, p2: p2});
-    this._edgesArray.push({p1: p2, p2: p1});//TODO: FIX
+    if (p1 !== p2) {
+      this._edgesArray.push({p1: p2, p2: p1});
+    }
     this.edges += 1;
     const p1root = this._insertVertex(p1);
     const p2root = this._insertVertex(p2);
@@ -1261,25 +1268,21 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       }
       nodes.set(v, {explored: false, finished: false, parent: 0});
     }
+    roots.sort((a, b) => a - b);
     const p1Array = this._edgesArray.map(edge => edge.p1);
 
-    var path = function (w, path) {
+    const path = function (w) {
+      const p = [];
       while (w !== 0) {
-        var n = nodes.get(w).parent;
-        if (n !== 0) {
-          path.push({p1: Math.min(n, w), p2 : Math.max(n, w)});
-        }
-        w = n;
+        p.push(w);
+        w = nodes.get(w).parent;
       }
-    };
-    
-    var eq = function (a, b) {
-      return a.p1 === b.p1 && a.p2 === b.p2;
+      return p;
     };
 
     for (const r of roots) {
       // https://en.wikipedia.org/wiki/Breadth-first_search#Pseudocode
-      let Q = new Queue();
+      const Q = new Queue();
       const root = nodes.get(r);
       console.assert(root.explored === false && root.parent === 0);
       root.explored = true;
@@ -1287,32 +1290,34 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       Q.push(r);
       while (Q.length > 0) {
         const v = Q.shift();
-        var start = indexOf(p1Array, v);
+        const start = indexOf(p1Array, v);
         //console.assert(p1Array.lastIndexOf(v) === start);
         for (let i = start; i >= 0 && this._edgesArray[i].p1 === v; i -= 1) {
           const edge = this._edgesArray[i];
           const p2 = nodes.get(edge.p2);
           if (p2.explored) {
-            if (p2.finished) continue;
-            // cycle
-            var path1 = [];
-            var path2 = [];
-
-            path(edge.p2, path1);
-            path(edge.p1, path2);
-            var i3 = 0;
-            while (path1.length - 1 - i3 >= 0 && path2.length - 1 - i3 >= 0 && eq(path1[path1.length - 1 - i3], path2[path2.length - 1 - i3])) {
-              i3 += 1;
+            if (p2.finished) {
+              continue;
             }
-            const e = {p1: Math.min(edge.p1, edge.p2), p2: Math.max(edge.p1, edge.p2)};
-            var edges = path1.slice(0, path1.length - i3).reverse().concat([e]).concat(path2.slice(0, path2.length - i3));
+            // cycle
+            const path1 = path(edge.p2);
+            const path2 = path(edge.p1);
+            let j = 0;
+            while (path1.length - 1 - j >= 0 && path2.length - 1 - j >= 0 && path1[path1.length - 1 - j] === path2[path2.length - 1 - j]) {
+              j += 1;
+            }
+            console.assert(j > 0);
+            const vertices = path1.slice(0, path1.length - (j - 1)).reverse().concat(path2.slice(0, path2.length - (j - 1)));
+            const edges = [];
+            for (let i = 1; i < vertices.length; i += 1) {
+              edges.push({p1: vertices[i - 1], p2: vertices[i]});
+            }
             const edgesMap = this._edges;
-            var data = edges.map(e => edgesMap.get(e.p1 * e.p2));
+            const data = edges.map(e => edgesMap.get(key(e.p1, e.p2)));
             onCycle(edges, data);
-
           } else {
             p2.explored = true;
-            p2.parent = edge.p1;
+            p2.parent = edge.p1; // v
             Q.push(edge.p2);
           }
         }
@@ -1336,8 +1341,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       } else {
         Y = Y.concat(lpY);
       }
-      const prev = j === 0 ? edges[edges.length - 1] : edges[j - 1];
-      s = (s * BigInt( prev.p1 === lp.p1 || prev.p2 === lp.p1 ? lp.p2 : lp.p1 )) % N;
+      s = (s * BigInt(lp.p2)) % N;
     }
     const sInverse = modInverse(s, N);
     if (sInverse === 0n) {
@@ -1358,24 +1362,26 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   };
 
-  const graph = new Graph();
+  let graph = new Graph();
   const foundGraphRelations = [];
-  let collected = false;
   let total = 0;
 
   function handleDoubleLargePrimeNext(p1, p2, x, polynomial, pb) {
+    if (graph == null) {
+      return;
+    }
     graph.insertEdge(p1, p2, {polynomial: polynomial, x: x, pb: pb.slice(0)});
     const cyclesCount = graph.edges + graph.components - graph.vertices;
     if (graph.edges % 10000 === 0) {
       console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
     }
-    if (cyclesCount > primes.length + 64 - total && !collected) {//TODO: !?
-      collected = true;//!?
+    if (cyclesCount > primes.length + 64 - total) {//TODO: !?
       console.debug('graph:', graph.edges, graph.components, graph.vertices, cyclesCount);
       console.time('collectGraphRelations');
       graph.iterateCycles(onCycle);
       console.timeEnd('collectGraphRelations');
       console.log(foundGraphRelations.length);
+      graph = null;
     }
   }
 
@@ -1700,7 +1706,7 @@ function QuadraticSieveFactorization(N) { // N - is not a prime
         if (true) {
           const now = performance.now();
           congruencesFound += 1;
-          if (false && congruencesFound % 800 === 0) {
+          if (false && congruencesFound % 50 === 0) {
             console.debug('smallSegmentTime: ' + QuadraticSieveFactorization.smallSegmentTime,
                           'largeSegmentTime: ' + QuadraticSieveFactorization.largeSegmentTime);
             return 1n;
