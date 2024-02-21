@@ -579,7 +579,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
     }
   }
   wheels0.sort((a, b) => +a.step - +b.step);
-  while (wheels0.length % 8 !== 0) {
+  while (wheels0.length % 16 !== 0) {
     wheels0.pop();
   }
   console.debug('wheels', wheels0.length);
