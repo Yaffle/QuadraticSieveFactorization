@@ -2,7 +2,7 @@
 
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
-import factorByPollardRhoSmall63m from './factorByPollardRhoSmall63m.js';
+import PollardsRho64 from './PollardsRho64.js';
 import isProbablyPrime64 from './isProbablyPrime64.js';
 
 function modInverse(a, m) {
@@ -1421,7 +1421,7 @@ function congruencesUsingQuadraticSieve(primes, N, sieveSize0) {
       //console.count('prime');
       return;
     }
-    const f = Number(factorByPollardRhoSmall63m(r, 2**18));
+    const f = Number(PollardsRho64(r, 2**18));
     if (f === 0 || f === 1) {
       console.count('cannot factor');
       return;      
