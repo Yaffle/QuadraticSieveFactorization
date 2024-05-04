@@ -1,6 +1,6 @@
 {
   "name": "quadraticsievefactorization",
-  "version": "1.0.74",
+  "version": "1.0.75",
   "description": "Quadratic Sieve integer factorization method for JavaScript bigints",
   "main": "QuadraticSieveFactorization.js",
   "scripts": {
@@ -31,6 +31,6 @@
     "QuadraticSieveFactorization.js"
   ],
   "dependencies": {
-    "pollardsrho": "^1.0.4"
+    "pollardsrho": "^1.0.5"
   }
 }

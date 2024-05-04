@@ -77,19 +77,22 @@ function isPrime(n) {
   if (typeof n !== "bigint") {
     throw new RangeError();
   }
-  if (n < 2n) {
+  if (n < 0n) {
     throw new RangeError();
   }
+  if (n < 2n) {
+    return false;
+  }
 
-  const smallPrimes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43];
-  const s = Number(n % 13082761331670030n);
+  const smallPrimes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41];
+  const s = Number(n % 304250263527210n);
   for (let i = 0; i < smallPrimes.length; i += 1) {
     const p = smallPrimes[i];
     if (s - Math.floor(s / p) * p === 0) {
       return n === BigInt(p);
     }
   }
-  if (n < 47 * 47) {
+  if (n < 43 * 43) {
     return true;
   }
 
