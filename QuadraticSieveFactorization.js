@@ -2,8 +2,8 @@
 
 import solve from './solve.js';
 import sqrtMod from './sqrtMod.js';
-import PollardsRho64 from './PollardsRho64.js';
-import isProbablyPrime64 from './isProbablyPrime64.js';
+import PollardsRho64 from './libs/PollardsRho64.js';
+import isProbablyPrime64 from './libs/isProbablyPrime64.js';
 
 function modInverse(a, m) {
   if (typeof a !== 'bigint' || typeof m !== 'bigint') {

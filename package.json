@@ -23,12 +23,14 @@
   "author": "Yaffe",
   "type": "module",
   "files": [
-    "isPrime.js",
     "isProbablyPrime64.js",
     "PollardsRho64.js",
     "solve.js",
     "sqrtMod.js",
     "wast2wasm.js",
     "QuadraticSieveFactorization.js"
-  ]
+  ],
+  "dependencies": {
+    "pollardsrho": "^1.0.4"
+  }
 }
