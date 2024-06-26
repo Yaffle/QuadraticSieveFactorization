@@ -9,6 +9,29 @@
   import isPrime from './libs/isPrime.js';
   //import QuadraticSieveFactorization from './QuadraticSieveFactorization.js';
 
+  function iroot(base, root) {
+    let s = base + 1n;
+    let k1 = root - 1n;
+    let u = 1n << (1n + BigInt(base.toString(16).length * 4) / root);
+    while (u < s) {
+      s = u;
+      u = ((u*k1) + base / (u ** k1)) / root;
+    }
+    return s;
+  }
+
+  function isPerfectPower(a) {
+    const size = a.toString(16).length * 4;
+    let r = 2;
+    do {
+      if (iroot(a, BigInt(r))**BigInt(r) === a) {
+        return r;
+      }
+      r += 1;
+    } while (size >= r);
+    return 1;
+  }
+
 const workerCode = `
 import QuadraticSieveFactorization from '<URL>';
 
@@ -68,9 +91,19 @@ self.onerror = function (message) {
         while (factors.length !== 0) {
           let a = factors.pop();
           while (a !== 1n) {
+            const r = isPerfectPower(a);
             if (isPrime(a)) {
               primeFactors.push(BigInt(a));
               a /= a;
+            } else if (r !== 1) {
+              const f = iroot(a, BigInt(r));
+              for (let i = 0; i < r; i += 1) {
+                factors.push(f);
+                if (a % f !== 0n) {
+                  throw new RangeError();
+                }
+                a /= f;
+              }
             } else {
               const f = BigInt(await factorize(a));
               factors.push(f);
